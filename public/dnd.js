@@ -11,8 +11,8 @@ document.addEventListener("alpine:init", () => {
             ghostClass: "card-ghost",    // placeholder left in the target slot
             chosenClass: "card-chosen",  // card being picked up
             dragClass: "card-drag",
-            filter: "button, .card-action", // → / X don't start a drag
-            preventOnFilter: false,          // but their clicks still work
+            filter: "button, .card-action, select", // → / X / move-select don't start a drag
+            preventOnFilter: false,                // but their clicks still work
             onEnd(evt) {
                 if (evt.from === evt.to && evt.oldIndex === evt.newIndex) return;
                 queueMove(evt);
@@ -27,67 +27,73 @@ document.addEventListener("alpine:init", () => {
 // next drop's index computed against state the server never saw).
 let chain = Promise.resolve();
 
-// id -> { fromKey, oldIndex } for in-flight moves, used to snap back on error
+// Bumped on failure: queued moves captured the old generation and skip
+// themselves, so stale indexes are never replayed against the server.
+let gen = 0;
+
+// id -> { fromKey, oldIndex } for in-flight moves (failure handling keys off it)
 const pending = new Map();
 
 function queueMove(evt) {
     const id = evt.item.id.replace(/^card-/, "");
     const toColumn = evt.to.id.replace(/^col-/, "");
-    const fromKey = evt.from.id.replace(/^col-/, "");
     const toIndex = evt.newIndex;
-    const meta = { fromKey, oldIndex: evt.oldIndex };
+    const myGen = gen;
     // temporary failure injection: open the page as /?fail=1
+    // (test scaffolding, remove in step 8)
     const forceFail = new URLSearchParams(location.search).has("fail");
 
-    pending.set(id, meta);
+    pending.set(id, {});
     chain = chain
-        .then(() =>
-            htmx.ajax("POST", `/tasks/${id}/move`, {
+        .then(() => {
+            if (myGen !== gen) return; // queue was cleared by a failure
+            return htmx.ajax("POST", `/tasks/${id}/move`, {
                 target: evt.to.closest(".column"),
                 swap: "outerHTML",
                 values: { toColumn, toIndex: String(toIndex), ...(forceFail ? { forceFail: "1" } : {}) },
-            })
-        )
+            });
+        })
         .then(() => pending.delete(id))
-        .catch(() => failMove(id));
+        .catch(() => failMove());
 }
 
-function failMove(id) {
-    const meta = pending.get(id);
-    pending.delete(id);
-    if (!meta) return; // already handled by the event listener (or vice versa)
-    snapBack(id, meta);
+// One failed move invalidates everything queued behind it: those drops were
+// indexed against a DOM state the server never saw. Drop the queue, re-fetch
+// the columns (GET /board) so the DOM matches server truth, and start over.
+function failMove() {
+    gen++;
+    chain = Promise.resolve();
+    pending.clear();
+    htmx.ajax("GET", "/board", { target: "#board", swap: "innerHTML" });
+    showToast("Move failed, card put back");
+    announce("Move failed, card put back");
 }
 
-function snapBack(id, { fromKey, oldIndex }) {
-    const card = document.getElementById(`card-${id}`);
-    const col = document.querySelector(`#col-${fromKey}`); // fresh lookup: an earlier OOB swap may have replaced evt.from
-    if (card && col) {
-        const cards = [...col.querySelectorAll(".card")];
-        col.insertBefore(card, cards[oldIndex] ?? null);
-    }
-    // ponytail: column counts go stale after a manual snap-back; next successful server response re-renders them
-    showToast("Move failed — card put back");
-}
-
-for (const type of ["htmx:responseError", "htmx:sendError"]) {
-    document.addEventListener(type, (e) => {
-        const path = e.detail?.requestConfig?.path ?? "";
-        const id = path.match(/\/tasks\/(\d+)\/move/)?.[1];
-        if (id) failMove(id);
-    });
-}
+// The move response swaps whole columns away, destroying the select that was
+// focused/dragged from. After every successful move, re-focus the moved
+// card's select so keyboard users keep their place. Fires for drag and
+// keyboard moves alike (both go through POST /tasks/:id/move).
+document.addEventListener("htmx:afterSettle", (e) => {
+    const path = e.detail?.xhr?.responseURL ?? "";
+    const id = path.match(/\/tasks\/(\d+)\/move/)?.[1];
+    if (!id) return;
+    document.getElementById(`move-${id}`)?.focus();
+});
 
 let toastEl;
 function showToast(msg) {
     if (!toastEl) {
         toastEl = document.createElement("div");
         toastEl.className = "toast";
-        toastEl.setAttribute("role", "status");
         document.body.appendChild(toastEl);
     }
     toastEl.textContent = msg;
     toastEl.classList.add("toast-show");
     clearTimeout(showToast.t);
     showToast.t = setTimeout(() => toastEl.classList.remove("toast-show"), 3000);
+}
+
+function announce(msg) {
+    const region = document.getElementById("move-status");
+    if (region) region.textContent = msg;
 }
