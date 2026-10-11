@@ -13,11 +13,19 @@ npm install
 npm run dev        # http://localhost:3000  (nodemon)
 npm test           # node:test, no framework
 PORT=8080 npm run dev   # optional: PORT overrides the default 3000
+DATA_FILE=/tmp/mb.json npm run dev  # optional: data file path (default data/miniboard.json)
 ```
 
 No build step. Client libraries are vendored under `public/vendor` (htmx 2.0.4,
 Alpine 3.17.4, its persist plugin, SortableJS 1.15.6) and served by
 `express.static` — nothing is fetched from a CDN at runtime.
+
+Data lives in one JSON file (`data/miniboard.json`, gitignored; override with
+`DATA_FILE`). Every mutation schedules a debounced (~200ms) atomic write
+(temp file + rename), and SIGINT/SIGTERM flush before exit. A missing file
+seeds the three demo boards; a corrupt one is renamed to
+`miniboard.json.bak-<timestamp>`, warned about once, and reseeded — the
+server never crashes on a bad file. Tests point `DATA_FILE` at a temp dir.
 
 ## Layout
 
@@ -30,7 +38,8 @@ src/routes/boards.js      GET /boards, /boards/:id (view fragments);
 src/routes/board.js       POST /tasks/:id/move; DELETE /tasks/:id (both view-aware)
 src/routes/tasks.js       POST /tasks (add, takes boardId)
 src/routes/notes.js       GET/POST /tasks/:id/notes, GET /tasks/:id/notes/current
-src/data/tasks.js         in-memory data: boards, tasks, notes, versioning
+src/data/tasks.js         boards, tasks, notes, versioning; JSON persistence
+src/data/miniboard.json   the data file (gitignored; override with DATA_FILE)
 src/views/index.ejs       page shell, notes drawer, script tags
 src/views/partials/       boards, board, banner, column, card, table, list,
                           move-select, notes-panel, note-status,
@@ -93,8 +102,9 @@ offers a one-click return — switching boards first if the note lives elsewhere
 
 ## Known gaps
 
-- **Server memory only** — a restart resets every task and note; stale localStorage drafts then hit the "server was reset" conflict path.
+- **Single process only** — the JSON file is written with atomic renames, but two servers sharing one `DATA_FILE` would overwrite each other.
+- **Debounced writes** — a hard kill (SIGKILL, power loss) can lose the last ~200ms of edits; only SIGINT/SIGTERM flush first.
 - **Single user** — no accounts, no sharing, no realtime sync beyond the two-tab localStorage rules.
 - **Plain-text notes** — no markdown rendering or preview.
-- **No automated browser tests** — node:test covers the server and the pure draft logic; drag, alt+arrow and the drawer flows are checked by hand.
+- **No automated browser tests** — node:test covers the server, persistence and the pure draft logic; drag, alt+arrow and the drawer flows are checked by hand.
 - **Single-tab-wins UI state** — the focused tab ignores the others, so a second tab cannot steal the open note.

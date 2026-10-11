@@ -1,12 +1,12 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 const boardSeed = [
     { id: 1, name: "Designs" },
     { id: 2, name: "Branding" },
     { id: 3, name: "Email Template" },
 ]
-
-let boards = boardSeed.map((b) => ({ ...b }))
-
-let nextBoardId = 4;
 
 const seed = [
     { id: 1, boardId: 1, title: "Research landing page trend", status: "planned", order: 0, note: "", version: 0, updatedAt: null },
@@ -19,9 +19,64 @@ const seed = [
     { id: 8, boardId: 3, title: "Unsubscribe footer copy", status: "done", order: 0, note: "", version: 0, updatedAt: null },
 ]
 
-let tasks = seed.map((t) => ({ ...t }))
+// --- persistence: one JSON file, atomic writes, debounced ~200ms ---
+// DATA_FILE overrides the path (tests point it at a temp file). A missing file
+// seeds fresh; a corrupt one is renamed aside and seeds fresh — never crash.
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const DATA_FILE = process.env.DATA_FILE ?? path.join(ROOT, "data", "miniboard.json");
 
-let nextId = 9;
+const loadState = () => {
+    let raw;
+    try {
+        raw = fs.readFileSync(DATA_FILE, "utf8");
+    } catch {
+        return null; // no file yet: seed
+    }
+    let parsed = null;
+    try {
+        parsed = JSON.parse(raw);
+    } catch {}
+    const ok = parsed
+        && Array.isArray(parsed.boards) && parsed.boards.length > 0
+        && Array.isArray(parsed.tasks)
+        && Number.isInteger(parsed.nextId)
+        && Number.isInteger(parsed.nextBoardId);
+    if (!ok) {
+        const backup = `${DATA_FILE}.bak-${Date.now()}`;
+        try { fs.renameSync(DATA_FILE, backup); } catch {}
+        console.warn(`miniboard: data file was corrupt, moved to ${backup} and reseeded`);
+        return null;
+    }
+    return parsed;
+};
+
+const restored = loadState();
+
+let boards = restored ? restored.boards : boardSeed.map((b) => ({ ...b }));
+let tasks = restored ? restored.tasks : seed.map((t) => ({ ...t }));
+let nextId = restored ? restored.nextId : 9;
+let nextBoardId = restored ? restored.nextBoardId : 4;
+
+const snapshot = () => JSON.stringify({ boards, tasks, nextId, nextBoardId }, null, 2);
+
+let saveTimer = null;
+
+// Atomic: write a temp file, then rename it over the real one — a crash
+// mid-write leaves the previous file intact. unref so a pending save never
+// holds the process open; the SIGINT/SIGTERM handlers in server.js flush first.
+export const flush = () => {
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
+    const tmp = `${DATA_FILE}.tmp`;
+    fs.writeFileSync(tmp, snapshot());
+    fs.renameSync(tmp, DATA_FILE);
+};
+
+const scheduleSave = () => {
+    if (saveTimer) return;
+    saveTimer = setTimeout(flush, 200);
+    saveTimer.unref();
+};
 
 export const columns = [
     {key: "planned", label: "Planned"},
@@ -37,6 +92,7 @@ export const findBoard = (id) => boards.find((b) => b.id === Number(id))
 export const addBoard = (name) => {
     const board = { id: nextBoardId++, name };
     boards.push(board);
+    scheduleSave();
     return board;
 }
 
@@ -44,6 +100,7 @@ export const renameBoard = (id, name) => {
     const board = findBoard(id);
     if (!board) return null;
     board.name = name;
+    scheduleSave();
     return board;
 }
 
@@ -55,6 +112,7 @@ export const removeBoard = (id) => {
     boards = boards.filter((b) => b !== board);
     const removedTasks = tasks.filter((t) => t.boardId === board.id);
     tasks = tasks.filter((t) => t.boardId !== board.id);
+    scheduleSave();
     return { ok: true, board, removedTasks };
 }
 
@@ -72,16 +130,24 @@ export const addTask = (title, status, boardId = 1) => {
         title,
         status,
         boardId: Number(boardId),
-        order: tasksInColumn(status, boardId).length
+        order: tasksInColumn(status, boardId).length,
+        // full task shape: a task missing these would conflict on its first note save
+        note: "",
+        version: 0,
+        updatedAt: null
     }
     tasks.push(newTask);
+    scheduleSave();
     return newTask;
 }
 
 export const removeTask = (id) => {
     const task = findTask(id);
     tasks = tasks.filter((t) => t !== task);
-    if (task) tasksInColumn(task.status, task.boardId).forEach((t, i) => t.order = i);
+    if (task) {
+        tasksInColumn(task.status, task.boardId).forEach((t, i) => t.order = i);
+        scheduleSave();
+    }
     return task;
 }
 
@@ -100,6 +166,7 @@ export const moveTask = (id, toColumn, toIndex) => {
     task.status = toColumn;
     rest.forEach((t, i) => t.order = i);
     if (fromColumn !== toColumn) tasksInColumn(fromColumn, task.boardId).forEach((t, i) => t.order = i);
+    scheduleSave();
 
     return { ok: true, task, fromColumn, toColumn };
 }
@@ -155,5 +222,6 @@ export const saveNote = (id, text, baseVersion) => {
     task.note = String(text ?? "").slice(0, NOTE_MAX);
     task.version += 1;
     task.updatedAt = new Date().toISOString();
+    scheduleSave();
     return { ok: true, note: task.note, version: task.version, updatedAt: task.updatedAt };
 }
