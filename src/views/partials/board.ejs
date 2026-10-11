@@ -1,40 +1,5 @@
 <div class="columns">
     <% columns.forEach(col=> { %>
-        <section class="column">
-            <div class="column-head">
-                <span class="dot dot-<%= col.key %>"></span>
-                <h2>
-                    <%= col.label %>
-                </h2>
-                <span class="count">
-                    <%= tasks.filter(t=> t.status === col.key).length %>
-                </span>
-            </div>
-
-            <div class="cards" id="col-<%= col.key %>">
-                <% tasks.filter(t=> t.status === col.key).forEach(task => { %>
-                    <!-- unescaped output so the card markup renders as HTML -->
-                    <%- include("card", {task}) %>
-                        <%}) %>
-            </div>
-
-            <% if(col.key === "planned") {%>
-                <div class="add-wrap" x-data="{adding: false}">
-                    <button class="add-btn" x-show="!adding" @click="adding = true">+ Add Task</button>
-
-                    <form class="add-form" x-show="adding"
-                        hx-post="/tasks"
-                        hx-target="#col-planned"
-                        hx-swap="beforeend"
-                        @htmx:after-request="$el.reset()"
-                    >
-                        <input name="title" placeholder="Task title" required autofocus>
-                        <input type="hidden" name="status" value="planned">
-                        <button type="submit">Add</button>
-                    </form>
-
-                </div>
-            <% } %>
-        </section>
-        <%}) %>
+        <%- include("column", {col, tasks, columns, oob: false}) %>
+            <%}) %>
 </div>
