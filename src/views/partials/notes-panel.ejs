@@ -1,0 +1,21 @@
+<div class="notes-backdrop" x-show="open" x-cloak x-transition.opacity @click="closeIt()"></div>
+<aside class="notes-panel" x-show="open" x-cloak x-transition
+    role="dialog" aria-labelledby="notes-title">
+    <div class="notes-head">
+        <h2 id="notes-title"><%= task.title %></h2>
+        <button type="button" class="notes-close" @click="closeIt()" aria-label="Close notes">×</button>
+    </div>
+    <form class="notes-form"
+        hx-post="/tasks/<%= task.id %>/notes"
+        hx-target="#note-status"
+        hx-swap="innerHTML">
+        <label class="sr-only" for="note-<%= task.id %>">Note for <%= task.title %></label>
+        <textarea class="notes-textarea" id="note-<%= task.id %>" name="note"
+            placeholder="Write a note..."><%= note.note %></textarea>
+        <input type="hidden" name="version" value="<%= note.version %>">
+        <div class="notes-foot">
+            <button type="submit" class="notes-save">Save</button>
+            <div id="note-status" class="note-status" aria-live="polite"></div>
+        </div>
+    </form>
+</aside>

@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from 'url';
 import boardRoutes from "./routes/board.js";
 import taskRoutes from "./routes/tasks.js";
+import noteRoutes from "./routes/notes.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -23,5 +24,6 @@ app.get("/", (req,res)=> res.render('index'));
 
 app.use(boardRoutes)
 app.use(taskRoutes)
+app.use(noteRoutes)
 
 export default app;

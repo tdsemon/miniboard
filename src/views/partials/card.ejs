@@ -1,6 +1,8 @@
-<div class="card" id="card-<%= task.id %>">
+<div class="card<%= task.note ? " card-has-notes" : "" %>" id="card-<%= task.id %>"
+    :class="{ 'card-open': $store.notes.openId === <%= task.id %> }">
     <p class="card-title"><%= task.title %></p>
     <div class="card-action">
+        <span class="note-dot" title="Has a note"></span>
         <label class="sr-only" for="move-<%= task.id %>">Move <%= task.title %> to column</label>
         <select class="move-select" id="move-<%= task.id %>" name="toColumn"
             hx-post="/tasks/<%= task.id %>/move"
@@ -11,7 +13,13 @@
                 <option value="<%= c.key %>"<%= c.key === task.status ? " selected disabled" : "" %>><%= c.label %></option>
             <% }) %>
         </select>
+        <button class="notes-btn" id="notes-btn-<%= task.id %>"
+            hx-get="/tasks/<%= task.id %>/notes"
+            hx-target="#notes-drawer"
+            hx-swap="innerHTML"
+            @click="$store.notes.openId = <%= task.id %>; $dispatch('notes-open', { id: <%= task.id %> })">Note</button>
         <button class="chip" title="move right" hx-post="/tasks/<%= task.id %>/move" hx-target="#column-<%= task.status %>" hx-swap="outerHTML">→</button>
-        <button class="chip-danger" title="Delete" hx-delete="/tasks/<%= task.id %>" hx-target="#column-<%= task.status %>" hx-swap="outerHTML" hx-confirm="Delete this task?">X</button>
+        <button class="chip-danger" title="Delete" hx-delete="/tasks/<%= task.id %>" hx-target="#column-<%= task.status %>" hx-swap="outerHTML" hx-confirm="Delete this task?"
+            @htmx:after-request="if ($event.detail.successful && $store.notes.openId === <%= task.id %>) $dispatch('notes-close')">X</button>
     </div>
 </div>

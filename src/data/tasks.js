@@ -1,8 +1,8 @@
 const seed = [
-    { id: 1, title: "Research landing page trend", status: "planned", order: 0 },
-    { id: 2, title: "Design the hero section of physio", status: "progress", order: 0 },
-    { id: 3, title: "Make a video about Ai Maya", status: "planned", order: 1 },
-    { id: 4, title: "Build a small project with Alpinejs and htmx", status: "done", order: 0 },
+    { id: 1, title: "Research landing page trend", status: "planned", order: 0, note: "", version: 0, updatedAt: null },
+    { id: 2, title: "Design the hero section of physio", status: "progress", order: 0, note: "", version: 0, updatedAt: null },
+    { id: 3, title: "Make a video about Ai Maya", status: "planned", order: 1, note: "", version: 0, updatedAt: null },
+    { id: 4, title: "Build a small project with Alpinejs and htmx", status: "done", order: 0, note: "", version: 0, updatedAt: null },
 ]
 
 let tasks = seed.map((t) => ({ ...t }))
@@ -57,3 +57,20 @@ export const moveTask = (id, toColumn, toIndex) => {
 }
 
 export const searchTasks = (q) => tasks.filter((t) => t.title.toLowerCase().includes(q.toLowerCase()))
+
+export const getNote = (id) => {
+    const task = findTask(id);
+    if (!task) return { ok: false };
+    return { ok: true, note: task.note, version: task.version, updatedAt: task.updatedAt };
+}
+
+const NOTE_MAX = 10000;
+
+export const saveNote = (id, text) => {
+    const task = findTask(id);
+    if (!task) return { ok: false };
+    task.note = String(text ?? "").slice(0, NOTE_MAX);
+    task.version += 1;
+    task.updatedAt = new Date().toISOString();
+    return { ok: true, note: task.note, version: task.version, updatedAt: task.updatedAt };
+}

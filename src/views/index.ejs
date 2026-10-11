@@ -9,6 +9,11 @@
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/dist/Sortable.min.js"></script>
     <script src="/dnd.js"></script>
+    <script>
+        document.addEventListener("alpine:init", () => {
+            Alpine.store("notes", { openId: null });
+        });
+    </script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
 </head>
@@ -51,7 +56,22 @@
     </main>
 
    </div> 
-   
+
+   <!-- Notes drawer: outside #board so column swaps and the failure re-sync never touch it -->
+   <div id="notes-drawer" x-data="{
+       open: false,
+       lastFocusId: null,
+       closeIt() {
+           this.open = false;
+           this.$store.notes.openId = null;
+           this.$nextTick(() => document.getElementById('notes-btn-' + this.lastFocusId)?.focus());
+       }
+   }"
+       @notes-open.window="open = true; lastFocusId = $event.detail.id"
+       @notes-close.window="closeIt()"
+       @keydown.escape.window="open && closeIt()">
+   </div>
+    
     
 </body>
 </html>
