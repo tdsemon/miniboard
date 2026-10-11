@@ -522,6 +522,16 @@ body {
     filter: brightness(1.1);
 }
 
+.notes-retry {
+    background: none;
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    color: var(--accent);
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
 .note-status {
     font-size: 0.75rem;
     color: var(--text-muted);

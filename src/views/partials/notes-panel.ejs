@@ -5,17 +5,37 @@
         <h2 id="notes-title"><%= task.title %></h2>
         <button type="button" class="notes-close" @click="closeIt()" aria-label="Close notes">×</button>
     </div>
-    <form class="notes-form"
-        hx-post="/tasks/<%= task.id %>/notes"
-        hx-target="#note-status"
-        hx-swap="innerHTML">
+    <form class="notes-form" onsubmit="return false">
         <label class="sr-only" for="note-<%= task.id %>">Note for <%= task.title %></label>
         <textarea class="notes-textarea" id="note-<%= task.id %>" name="note"
-            placeholder="Write a note..."><%= note.note %></textarea>
-        <input type="hidden" name="version" value="<%= note.version %>">
+            placeholder="Write a note..."
+            hx-post="/tasks/<%= task.id %>/notes"
+            hx-trigger="input changed delay:800ms, save-now from:closest form"
+            hx-target="#note-status-swap"
+            hx-swap="innerHTML"
+            hx-sync="closest form:queue last"
+            @input="onInput()"
+            @focus="onFocus()"><%= note.note %></textarea>
+        <input type="hidden" id="note-version" name="version" value="<%= note.version %>">
         <div class="notes-foot">
-            <button type="submit" class="notes-save">Save</button>
-            <div id="note-status" class="note-status" aria-live="polite"></div>
+            <button type="button" class="notes-save"
+                hx-post="/tasks/<%= task.id %>/notes"
+                hx-target="#note-status-swap"
+                hx-swap="innerHTML"
+                hx-trigger="click"
+                hx-sync="closest form:queue last">Save</button>
+            <button type="button" class="notes-retry" x-show="status === 'error'" x-cloak
+                @click="retry()">Retry</button>
+            <div class="note-status" aria-live="polite">
+                <span x-show="status === 'editing'">editing…</span>
+                <span x-show="status === 'dirty'">unsaved changes</span>
+                <span x-show="status === 'saving'">saving…</span>
+                <span x-show="status === 'saved'" x-text="savedLabel"></span>
+                <span x-show="status === 'error'">save failed</span>
+                <!-- server swaps land here: OOB version input does the real work,
+                     this div stays empty so Alpine keeps the visible labels -->
+                <div id="note-status-swap"></div>
+            </div>
         </div>
     </form>
 </aside>

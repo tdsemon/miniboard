@@ -12,8 +12,7 @@ router.get("/tasks/:id/notes", (req, res) => {
 router.post("/tasks/:id/notes", (req, res) => {
     const saved = saveNote(req.params.id, req.body?.note);
     if (!saved.ok) return res.status(404).send("");
-    const task = findTask(req.params.id);
-    res.render("partials/note-status", { ...saved, title: task.title });
+    res.render("partials/note-status", { version: saved.version });
 });
 
 export default router;
