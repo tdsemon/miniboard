@@ -4,8 +4,10 @@
     <p class="card-title"><%= task.title %></p>
     <div class="card-action">
         <span class="note-dot" title="Has a note"></span>
+        <!-- sr-only: keyboard users reach it by Tab; :focus-within on the card
+             reveals it (see .move-select rules in style.css) -->
         <label class="sr-only" for="move-<%= task.id %>">Move <%= task.title %> to column</label>
-        <select class="move-select" id="move-<%= task.id %>" name="toColumn"
+        <select class="move-select sr-only" id="move-<%= task.id %>" name="toColumn"
             hx-post="/tasks/<%= task.id %>/move"
             hx-trigger="change"
             hx-target="#column-<%= task.status %>"
@@ -16,7 +18,6 @@
         </select>
         <button class="notes-btn" id="notes-btn-<%= task.id %>"
             @click="$dispatch('notes-open', { id: <%= task.id %> })">Note</button>
-        <button class="chip" title="move right" hx-post="/tasks/<%= task.id %>/move" hx-target="#column-<%= task.status %>" hx-swap="outerHTML">→</button>
         <button class="chip-danger" title="Delete" hx-delete="/tasks/<%= task.id %>" hx-target="#column-<%= task.status %>" hx-swap="outerHTML" hx-confirm="Delete this task?"
             @htmx:after-request="if ($event.detail.successful && $store.notes.openId === <%= task.id %>) $dispatch('notes-close-force')">X</button>
     </div>

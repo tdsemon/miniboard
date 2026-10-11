@@ -364,7 +364,9 @@ body {
     border: 0;
 }
 
-/* Card actions: keyboard move select + → / X buttons */
+/* Card actions: hidden keyboard move select + X button. The select is sr-only
+   in markup and only revealed when the card or the select itself is focused,
+   so drag stays the main way to move without costing keyboard users a route. */
 .card-action {
     display: flex;
     align-items: center;
@@ -386,6 +388,19 @@ body {
 .move-select:hover {
     border-color: var(--accent);
     color: var(--text-main);
+}
+
+/* undo sr-only when the card (or the select) has focus — stays tabbable
+   throughout, this only restores layout */
+.card:focus-within .move-select.sr-only {
+    position: static;
+    width: auto;
+    height: auto;
+    padding: 0.15rem 0.3rem;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: nowrap;
 }
 
 .move-select:focus-visible {

@@ -3,13 +3,6 @@ import { findTask, columns, getTask, removeTask, searchTasks, moveTask, tasksInC
 
 const router = Router();
 
-const NEXT = {
-    planned: "progress",
-    progress: "done",
-    done: "done"
-
-}
-
 const renderPartial = (res, name, data) =>
     new Promise((resolve, reject) => {
         res.render(name, data, (err, html) => (err ? reject(err) : resolve(html)));
@@ -47,24 +40,19 @@ router.delete("/tasks/:id", async (req,res) => {
 router.post("/tasks/:id/move", async (req,res) => {
     const { toColumn, toIndex: rawIndex } = req.body ?? {};
     if (req.body?.forceFail) return res.status(500).send(""); // temporary: ?fail=1 failure injection (test scaffolding, remove in step 8)
-    let column = toColumn;
-    let index;
-    if (column === undefined) {
-        const task = findTask(req.params.id);
-        if (!task) return res.status(404).send("");
-        column = NEXT[task.status];
-        index = tasksInColumn(column).length;
-    } else {
-        index = rawIndex === undefined ? tasksInColumn(column).length : Number(rawIndex);
-        if (!Number.isInteger(index)) return res.status(400).send("");
-    }
+    // drag (dnd.js) and the keyboard select always send toColumn; a body
+    // without one has no caller left (the → button is gone), so treat it as
+    // a bad request instead of inventing a destination.
+    if (toColumn === undefined) return res.status(400).send("");
+    const index = rawIndex === undefined ? tasksInColumn(toColumn).length : Number(rawIndex);
+    if (!Number.isInteger(index)) return res.status(400).send("");
 
-    const result = moveTask(req.params.id, column, index);
+    const result = moveTask(req.params.id, toColumn, index);
     if (!result.ok) return res.status(result.reason === "not-found" ? 404 : 400).send("");
 
     // contract: primary fragment = the column the card came FROM (clients always
-    // target it), OOB = the column it went TO. One shape serves drag, → button
-    // and the keyboard select alike.
+    // target it), OOB = the column it went TO. One shape serves drag and the
+    // keyboard select alike.
     let out = await renderColumn(res, result.fromColumn);
     if (result.fromColumn !== result.toColumn) out += await renderColumn(res, result.toColumn, true);
     const label = columns.find((c) => c.key === result.toColumn).label;

@@ -35,4 +35,9 @@ test("move route response shape", async (t) => {
         // oob attr sits on the destination section (sections also carry tabindex="-1")
         assert.match(html, /<section class="column" id="column-done"[^>]*hx-swap-oob="true">/);
     });
+
+    await t.test("missing toColumn is a 400 (no implicit move-right caller)", async () => {
+        const res = await fetch(`${base}/tasks/3/move`, form(""));
+        assert.equal(res.status, 400);
+    });
 });
