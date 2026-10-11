@@ -12,6 +12,7 @@ nix develop        # nodejs 22 + npm
 npm install
 npm run dev        # http://localhost:3000  (nodemon)
 npm test           # node:test, no framework
+PORT=8080 npm run dev   # optional: PORT overrides the default 3000
 ```
 
 No build step. Client libraries are vendored under `public/vendor` (htmx 2.0.4,
@@ -21,7 +22,7 @@ Alpine 3.17.4, its persist plugin, SortableJS 1.15.6) and served by
 ## Layout
 
 ```
-server.js                 entry point, listens on :3000
+server.js                 entry point, listens on PORT (default 3000)
 src/app.js                express app: static files, ejs, routes
 src/routes/board.js       GET /board, /search; POST /tasks/:id/move; DELETE /tasks/:id
 src/routes/tasks.js       POST /tasks (add)
@@ -71,3 +72,11 @@ the draft and the continue-banner state.
 **Resume** — `miniboard:ui` stores the open task, cursor, scroll position and
 the last-edited snippet, so a reload or a closed tab reopens the drawer where
 it was and the continue banner offers a one-click return.
+
+## Known gaps
+
+- **Server memory only** — a restart resets every task and note; stale localStorage drafts then hit the "server was reset" conflict path.
+- **Single user** — no accounts, no sharing, no realtime sync beyond the two-tab localStorage rules.
+- **Plain-text notes** — no markdown rendering or preview.
+- **No automated browser tests** — node:test covers the server and the pure draft logic; drag, alt+arrow and the drawer flows are checked by hand.
+- **Single-tab-wins UI state** — the focused tab ignores the others, so a second tab cannot steal the open note.
