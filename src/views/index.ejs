@@ -1,0 +1,53 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Miniboard</title>
+    <link rel="stylesheet" href="/style.css">
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+</head>
+<body>
+
+
+   <div class="app" x-data="{sidebarOpen: true, view: 'board', editing: false}">
+    <aside class="sidebar" x-show="sidebarOpen">
+        <div class="brand">Miniboard</div>
+        <nav class="projects">
+            <a class="active">Designs</a>
+            <a>Branding</a>
+            <a>Email Template</a>
+        </nav>
+    </aside>
+
+    <main class="main">
+        <header class="topbar">
+            <button class="icon-btn" @click="sidebarOpen = !sidebarOpen">☰</button>
+            <div class="tabs">
+                <button :class="view ==='board' && 'active'" @click="view = 'board'">Board</button>
+                <button :class="view ==='table' && 'active'"@click="view = 'table'">Table</button>
+                <button :class="view ==='list' && 'active'" @click="view = 'list'">List</button>
+            </div>
+
+            <input class="search" type="search" name="q" placeholder="Search task..."
+                hx-get="/search" hx-trigger="keyup changed delay:300ms" hx-target="#board" hx-swap="innerHTML"
+            >
+
+        </header>
+        
+        <div id="board" x-show="view === 'board'" class="board-wrap" hx-get="/board" hx-trigger="load" hx-swap="innerHTML">
+            <span>Loading board......</span>
+        </div>
+        <div x-show="view === 'table'">This will load the Table</div>
+        <div x-show="view === 'list'">This will load the List</div>
+
+    </main>
+
+   </div> 
+   
+    
+</body>
+</html>

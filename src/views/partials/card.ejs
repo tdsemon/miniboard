@@ -1,0 +1,7 @@
+<div class="card" id="card-<%= task.id %>">
+    <p class="card-title"><%= task.title %></p>
+    <div class="card-action">
+        <button class="chip" title="move right" hx-post="/tasks/<%= task.id %>/move" hx-target="#board" hx-swap="innerHTML">→</button>
+        <button class="chip-danger" title="Delete" hx-delete="/tasks/<%= task.id %>" hx-target="#card-<%= task.id %>" hx-swap="outerHTML" hx-confirm="Delete this task?">X</button>
+    </div>
+</div>
