@@ -43,6 +43,7 @@ router.delete("/tasks/:id", async (req,res) => {
 
 router.post("/tasks/:id/move", async (req,res) => {
     const { toColumn, toIndex: rawIndex } = req.body ?? {};
+    if (req.body?.forceFail) return res.status(500).send(""); // temporary: ?fail=1 failure injection
     let column = toColumn;
     let index;
     if (column === undefined) {

@@ -9,6 +9,10 @@
     --accent-soft: #eef2ff;
     --sidebar-width: 260px;
     --topbar-height: 60px;
+    --ghost-bg: #eef2ff;
+    --ghost-border: #4f46e5;
+    --chosen-shadow: 0 8px 20px rgba(17, 24, 39, 0.15);
+    --toast-bg: #111827;
 }
 
 * {
@@ -343,4 +347,40 @@ body {
 
 .add-form button:hover {
     filter: brightness(1.1);
+}
+
+/* Drag & drop (SortableJS classes set in public/dnd.js) */
+.card-ghost {
+    opacity: 0.5;
+    background: var(--ghost-bg);
+    border: 1px dashed var(--ghost-border);
+}
+
+.card-chosen {
+    border-color: var(--accent);
+}
+
+.card-drag {
+    box-shadow: var(--chosen-shadow);
+    cursor: grabbing;
+}
+
+/* Toast for failed moves */
+.toast {
+    position: fixed;
+    bottom: 1.25rem;
+    right: 1.25rem;
+    background: var(--toast-bg);
+    color: #fff;
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+.toast-show {
+    opacity: 1;
 }

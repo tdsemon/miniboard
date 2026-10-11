@@ -9,7 +9,7 @@
         </span>
     </div>
 
-    <div class="cards" id="col-<%= col.key %>">
+    <div class="cards" id="col-<%= col.key %>" x-sortable>
         <% tasks.filter(t=> t.status === col.key).sort((a, b) => a.order - b.order).forEach(task => { %>
             <!-- unescaped output so the card markup renders as HTML -->
             <%- include("card", {task, columns}) %>
