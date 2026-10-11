@@ -24,12 +24,16 @@ Alpine 3.17.4, its persist plugin, SortableJS 1.15.6) and served by
 ```
 server.js                 entry point, listens on PORT (default 3000)
 src/app.js                express app: static files, ejs, routes
-src/routes/board.js       GET /board, /search; POST /tasks/:id/move; DELETE /tasks/:id
-src/routes/tasks.js       POST /tasks (add)
+src/routes/boards.js      GET /boards, /boards/:id (view fragments);
+                          POST /boards (add), /boards/:id (rename);
+                          DELETE /boards/:id (blocks the last board)
+src/routes/board.js       POST /tasks/:id/move; DELETE /tasks/:id (both view-aware)
+src/routes/tasks.js       POST /tasks (add, takes boardId)
 src/routes/notes.js       GET/POST /tasks/:id/notes, GET /tasks/:id/notes/current
-src/data/tasks.js         in-memory data: tasks, notes, versioning
+src/data/tasks.js         in-memory data: boards, tasks, notes, versioning
 src/views/index.ejs       page shell, notes drawer, script tags
-src/views/partials/       board, column, card, notes-panel, note-status,
+src/views/partials/       boards, board, banner, column, card, table, list,
+                          move-select, notes-panel, note-status,
                           note-conflict, note-current, announce
 public/dnd.js             x-sortable directive, move queue, alt+arrow reorder
 public/notes.js           notes drawer: status machine, drafts, conflict
@@ -40,13 +44,26 @@ test/                     node:test suites
 
 ## Contracts
 
+**Boards & views** — every board has three views, all rendered server-side into
+the same `#board` element: `?view=board` (columns), `table` (sortable via
+`?sort=title|status|note|order&dir=asc|desc`) and `list` (grouped rows).
+`?q=` filters any view. The client keeps `activeBoardId`, `view`, `sort` and
+`dir` in the persisted `miniboard:ui` store and builds the URL in one place
+(`refreshBoard` in notes.js), so a reload lands on the same board + view.
+`DELETE /boards/:id` refuses the last board, deletes its tasks, and echoes
+`data-removed-task-ids` so the client drops those tasks' drafts. The sidebar
+nav (`GET /boards`) is swapped whole by add/rename/delete; the active marker
+reads the Alpine store, not server state.
+
 **Move** — `POST /tasks/:id/move` with `toColumn` (required, 400 without it)
 and `toIndex` (optional integer, clamped by the server). The response is the
 column the card came *from* (swap it with `outerHTML`), plus an out-of-band
 swap of the destination column when it changed, plus an aria-live announce
 div. Within-column moves announce `position N of M`; cross-column ones name
 the destination column. Drag, the move select and alt+arrow all use this one
-endpoint.
+endpoint. A request from the Table or List view also sends `view` (+ `sort`,
+`dir`, `q`); the server then re-renders that view into `#board` instead of the
+column fragments. A move never crosses boards.
 
 **Notes** — `POST /tasks/:id/notes` with `note` and `version` (the version the
 textarea was loaded with; missing or non-numeric is a 400). 200 returns an
@@ -69,9 +86,10 @@ server's and saves (overwriting the server), *take server* re-fetches
 read-only while the bar is up, autosave stops, and closing the drawer keeps
 the draft and the continue-banner state.
 
-**Resume** — `miniboard:ui` stores the open task, cursor, scroll position and
-the last-edited snippet, so a reload or a closed tab reopens the drawer where
-it was and the continue banner offers a one-click return.
+**Resume** — `miniboard:ui` stores the open task, cursor, scroll position, the
+last-edited snippet (with its board id) and the current board + view, so a
+reload or a closed tab reopens the drawer where it was and the continue banner
+offers a one-click return — switching boards first if the note lives elsewhere.
 
 ## Known gaps
 

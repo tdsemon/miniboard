@@ -1,0 +1,23 @@
+<%- include("banner") %>
+<div class="task-list">
+    <% columns.forEach((col) => { %>
+        <section class="list-group" id="list-<%= col.key %>">
+            <h2 class="list-head"><span class="dot dot-<%= col.key %>"></span><%= col.label %>
+                <span class="count"><%= tasks.filter((t) => t.status === col.key).length %></span></h2>
+            <% tasks.filter((t) => t.status === col.key).sort((a, b) => a.order - b.order).forEach((task) => { %>
+                <div class="list-row" id="row-<%= task.id %>" data-task-id="<%= task.id %>" data-board-id="<%= task.boardId %>">
+                    <span class="card-title task-title list-title"><%= task.title %></span>
+                    <% if (task.note) { %><span class="note-dot list-note" title="Has a note"></span><% } %>
+                    <%- include("move-select", {task, columns, target: "#board", swap: "innerHTML", view, sort, dir}) %>
+                    <button class="notes-btn" id="notes-btn-<%= task.id %>"
+                        @click="$dispatch('notes-open', { id: <%= task.id %> })">Note</button>
+                    <button title="Delete" hx-delete="/tasks/<%= task.id %>" hx-target="#board" hx-swap="innerHTML"
+                        hx-vals='js:({view: "<%= view %>", sort: "<%= sort %>", dir: "<%= dir %>", q: document.querySelector(".search")?.value ?? ""})'
+                        hx-confirm="Delete this task?"
+                        @htmx:after-request="if ($event.detail.successful && $store.notes.openId === <%= task.id %>) $dispatch('notes-close-force')">X</button>
+                </div>
+            <% }) %>
+        </section>
+    <% }) %>
+    <% if (!tasks.length) { %><p class="empty-view">No tasks<%= q ? ` matching “${q}”` : "" %> on this board.</p><% } %>
+</div>

@@ -1,0 +1,48 @@
+<%- include("banner") %>
+<div class="table-wrap">
+    <table class="task-table">
+        <!-- one sort toggle for the whole header row: click the same column to
+             flip dir, another column to start at asc, then re-render the view -->
+        <thead x-data="{
+            sort(k) {
+                const ui = this.$store.mb.ui;
+                if (ui.sort === k) ui.dir = ui.dir === 'asc' ? 'desc' : 'asc';
+                else { ui.sort = k; ui.dir = 'asc'; }
+                this.$store.mb.refresh();
+            }
+        }">
+            <tr>
+                <th scope="col"><button type="button" class="sort-btn" @click="sort('title')">Title<%= sort === "title" ? (dir === "asc" ? " ↑" : " ↓") : "" %></button></th>
+                <th scope="col"><button type="button" class="sort-btn" @click="sort('status')">Status<%= sort === "status" ? (dir === "asc" ? " ↑" : " ↓") : "" %></button></th>
+                <th scope="col"><button type="button" class="sort-btn" @click="sort('note')">Note<%= sort === "note" ? (dir === "asc" ? " ↑" : " ↓") : "" %></button></th>
+                <th scope="col"><button type="button" class="sort-btn" @click="sort('order')">Order<%= sort === "order" ? (dir === "asc" ? " ↑" : " ↓") : "" %></button></th>
+            </tr>
+        </thead>
+        <tbody>
+            <% tasks.forEach((task) => { %>
+                <tr id="row-<%= task.id %>" data-task-id="<%= task.id %>" data-board-id="<%= task.boardId %>">
+                    <td class="title-cell"><span class="card-title task-title"><%= task.title %></span></td>
+                    <td><%- include("move-select", {task, columns, target: "#board", swap: "innerHTML", view, sort, dir}) %></td>
+                    <td class="note-cell">
+                        <% if (task.note) { %>
+                            <span class="has-note">yes</span>
+                            <% if (task.updatedAt) { %><span class="note-when"><%= String(task.updatedAt).slice(0, 16).replace("T", " ") %></span><% } %>
+                        <% } else { %>
+                            <span class="no-note">—</span>
+                        <% } %>
+                    </td>
+                    <td class="order-cell"><%= task.order %></td>
+                    <td class="row-actions">
+                        <button class="notes-btn" id="notes-btn-<%= task.id %>"
+                            @click="$dispatch('notes-open', { id: <%= task.id %> })">Note</button>
+                        <button title="Delete" hx-delete="/tasks/<%= task.id %>" hx-target="#board" hx-swap="innerHTML"
+                            hx-vals='js:({view: "<%= view %>", sort: "<%= sort %>", dir: "<%= dir %>", q: document.querySelector(".search")?.value ?? ""})'
+                            hx-confirm="Delete this task?"
+                            @htmx:after-request="if ($event.detail.successful && $store.notes.openId === <%= task.id %>) $dispatch('notes-close-force')">X</button>
+                    </td>
+                </tr>
+            <% }) %>
+        </tbody>
+    </table>
+    <% if (!tasks.length) { %><p class="empty-view">No tasks<%= q ? ` matching “${q}”` : "" %> on this board.</p><% } %>
+</div>

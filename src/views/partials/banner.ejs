@@ -1,0 +1,10 @@
+<!-- Continue banner: markup is re-rendered with every view, but every value comes
+     from the persisted Alpine store ($store.mb.ui), so a swap can't wipe it and
+     storage can't inject markup (titles/snippets render through x-text only). -->
+<div class="continue-bar" x-data="continueBanner()" x-show="visible" role="status">
+    <p class="continue-msg">continue where you left off:
+        <strong x-text="title"></strong> - <span x-text="text"></span> - <span x-text="when"></span>
+    </p>
+    <button type="button" class="continue-open" @click="reopen()">Open</button>
+    <button type="button" class="continue-x" @click="dismiss()" aria-label="Dismiss continue banner">×</button>
+</div>

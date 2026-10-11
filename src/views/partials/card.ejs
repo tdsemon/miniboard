@@ -1,24 +1,10 @@
-<div class="card" id="card-<%= task.id %>" tabindex="-1"
+<div class="card" id="card-<%= task.id %>" tabindex="-1" data-task-id="<%= task.id %>" data-board-id="<%= task.boardId %>"
     x-init="$store.notes.hasNotes[<%= task.id %>] = <%= task.note ? "true" : "false" %>"
     :class="{ 'card-open': $store.notes.openId === <%= task.id %>, 'card-has-notes': $store.notes.hasNotes[<%= task.id %>] }">
     <p class="card-title"><%= task.title %></p>
     <div class="card-action">
         <span class="note-dot" title="Has a note"></span>
-        <!-- sr-only: keyboard users reach it by Tab; :focus-within on the card
-             reveals it (see .move-select rules in style.css). alt+arrow is the
-             no-mouse route, described here so the select carries the hint. -->
-        <span class="sr-only" id="move-hint-<%= task.id %>">Hold Alt and press the up or down arrow to move this card within the column.</span>
-        <label class="sr-only" for="move-<%= task.id %>">Move <%= task.title %> to column</label>
-        <select class="move-select sr-only" id="move-<%= task.id %>" name="toColumn"
-            aria-describedby="move-hint-<%= task.id %>"
-            hx-post="/tasks/<%= task.id %>/move"
-            hx-trigger="change"
-            hx-target="#column-<%= task.status %>"
-            hx-swap="outerHTML">
-            <% columns.forEach(c => { %>
-                <option value="<%= c.key %>"<%= c.key === task.status ? " selected disabled" : "" %>><%= c.label %></option>
-            <% }) %>
-        </select>
+        <%- include("move-select", {task, columns, target: "#column-" + task.status, swap: "outerHTML"}) %>
         <button class="notes-btn" id="notes-btn-<%= task.id %>"
             @click="$dispatch('notes-open', { id: <%= task.id %> })">Note</button>
         <button title="Delete" hx-delete="/tasks/<%= task.id %>" hx-target="#column-<%= task.status %>" hx-swap="outerHTML" hx-confirm="Delete this task?"

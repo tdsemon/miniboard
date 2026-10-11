@@ -24,38 +24,42 @@
 <body>
 
 
-   <div class="app" x-data="{sidebarOpen: true, view: 'board', editing: false}">
+   <!-- One Alpine object owns the shell: sidebar, the current view/board, and
+        the rename-in-progress id. Every board/view re-render goes through
+        $store.mb.refresh() (notes.js) so the URL always reflects the store;
+        htmx owns the request and the swap. -->
+   <div class="app" x-data="{
+        sidebarOpen: true,
+        editingId: null,
+        setView(v) { const ui = this.$store.mb.ui; if (ui.view !== v) { ui.view = v; this.$store.mb.refresh(); } },
+        pickBoard(id) { const ui = this.$store.mb.ui; if (ui.activeBoardId !== id) { ui.activeBoardId = id; this.$store.mb.refresh(); } },
+    }" x-init="$store.mb.refresh()">
     <aside class="sidebar" x-show="sidebarOpen">
         <div class="brand">Miniboard</div>
-        <nav class="projects">
-            <a class="active">Designs</a>
-            <a>Branding</a>
-            <a>Email Template</a>
-        </nav>
+        <!-- filled by GET /boards on load; every add/rename/delete re-swaps it -->
+        <nav id="boards" class="projects" hx-get="/boards" hx-trigger="load" hx-swap="outerHTML"></nav>
     </aside>
 
     <main class="main">
         <header class="topbar">
             <button class="icon-btn" @click="sidebarOpen = !sidebarOpen">☰</button>
             <div class="tabs">
-                <button :class="view ==='board' && 'active'" @click="view = 'board'">Board</button>
-                <button :class="view ==='table' && 'active'"@click="view = 'table'">Table</button>
-                <button :class="view ==='list' && 'active'" @click="view = 'list'">List</button>
+                <button :class="$store.mb.ui.view === 'board' && 'active'" @click="setView('board')">Board</button>
+                <button :class="$store.mb.ui.view === 'table' && 'active'" @click="setView('table')">Table</button>
+                <button :class="$store.mb.ui.view === 'list' && 'active'" @click="setView('list')">List</button>
             </div>
 
             <input class="search" type="search" name="q" placeholder="Search task..."
-                hx-get="/search" hx-trigger="keyup changed delay:300ms" hx-target="#board" hx-swap="innerHTML"
-            >
+                @input.debounce.300ms="$store.mb.refresh()">
 
         </header>
 
         <div id="move-status" class="sr-only" role="status" aria-live="polite"></div>
 
-        <div id="board" x-show="view === 'board'" class="board-wrap" hx-get="/board" hx-trigger="load" hx-swap="innerHTML">
+        <!-- board, table and list all render into this one element -->
+        <div id="board" class="board-wrap">
             <span>Loading board......</span>
         </div>
-        <div x-show="view === 'table'">This will load the Table</div>
-        <div x-show="view === 'list'">This will load the List</div>
 
     </main>
 

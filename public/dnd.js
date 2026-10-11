@@ -62,12 +62,12 @@ function queueMove(evt) {
 
 // One failed move invalidates everything queued behind it: those drops were
 // indexed against a DOM state the server never saw. Drop the queue, re-fetch
-// the columns (GET /board) so the DOM matches server truth, and start over.
+// the current board view (server truth) and start over.
 function failMove() {
     gen++;
     chain = Promise.resolve();
     focusCardAfter.clear();
-    htmx.ajax("GET", "/board", { target: "#board", swap: "innerHTML" });
+    Alpine.store("mb").refresh();
     showToast("Move failed, card put back");
     announce("Move failed, card put back");
 }

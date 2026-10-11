@@ -84,6 +84,25 @@ const writeKey = (key, value) => {
 
 const mb = () => Alpine.store("mb");
 
+// One re-render path for every board/view switch. The URL is built here (from
+// the persisted store + the search box) because htmx's js: expressions can read
+// the DOM but not Alpine stores — so Alpine calls this, htmx does the swap.
+function refreshBoard() {
+    const ui = mb()?.ui;
+    if (!ui) return;
+    const q = document.querySelector(".search")?.value ?? "";
+    const params = new URLSearchParams({
+        view: ui.view || "board",
+        sort: ui.sort || "order",
+        dir: ui.dir || "asc",
+        q,
+    });
+    htmx.ajax("GET", `/boards/${ui.activeBoardId ?? 1}?${params}`, {
+        target: "#board",
+        swap: "innerHTML",
+    });
+}
+
 // --- throttled ui capture (~300ms). values land in the store, Alpine's $persist
 // effect does the actual write. ---
 let uiTimer = null;
@@ -151,11 +170,18 @@ document.addEventListener("alpine:initializing", () => {
             cursorEnd: 0,
             scrollTop: 0,
             focusedColumn: null,
-            lastEdited: null, // { taskId, at, snippet } -> continue banner
+            lastEdited: null, // { taskId, boardId, at, snippet } -> continue banner
+            // board + view the user is looking at: persisted so a reload lands
+            // on the same place, and read by every refreshBoard() call
+            activeBoardId: 1,
+            view: "board", // board | table | list
+            sort: "order", // table view: title | status | note | order
+            dir: "asc",
         })
             .as(KEY_UI)
             .using(safeStorage),
         drafts: Alpine.$persist({}).as(KEY_DRAFTS).using(safeStorage),
+        refresh: refreshBoard,
     });
 
     // one app-wide ticker: the banner's "time since" reads $store.notes.tickNow
@@ -208,19 +234,55 @@ document.addEventListener("alpine:initializing", () => {
         }
         const drawerOpen = Alpine.store("notes")?.openId != null;
         if (prop === "drafts" ? drawerOpen : drawerOpen && editorHasFocus()) return;
+        if (prop === "ui") {
+            const board = store.ui.activeBoardId;
+            const view = store.ui.view;
+            store.ui = incoming;
+            // another tab switched boards or views: keep this tab's screen honest
+            if (incoming.activeBoardId !== board || incoming.view !== view) refreshBoard();
+            return;
+        }
         store[prop] = incoming;
     });
 
-    // deleting a task drops its draft and anything pointing at it
+    // deleting a task drops its draft and anything pointing at it; deleting a
+    // board drops the drafts of the tasks the server removed with it (the
+    // route echoes their ids) and lands on a board that still exists
     document.addEventListener("htmx:after-request", (e) => {
         const path = e.detail?.elt?.getAttribute?.("hx-delete");
         if (!path || !e.detail.successful) return;
-        const id = Number(path.match(/\/tasks\/(\d+)/)?.[1]);
         const store = mb();
-        if (!Number.isFinite(id) || !store) return;
-        if (store.drafts[id]) delete store.drafts[id];
-        if (Number(store.ui.openTaskId) === id) store.ui.openTaskId = null;
-        if (Number(store.ui.lastEdited?.taskId) === id) store.ui.lastEdited = null;
+        if (!store) return;
+
+        const taskId = Number(path.match(/\/tasks\/(\d+)/)?.[1]);
+        if (Number.isFinite(taskId)) {
+            if (store.drafts[taskId]) delete store.drafts[taskId];
+            if (Number(store.ui.openTaskId) === taskId) store.ui.openTaskId = null;
+            if (Number(store.ui.lastEdited?.taskId) === taskId) store.ui.lastEdited = null;
+            return;
+        }
+
+        const boardId = Number(path.match(/\/boards\/(\d+)/)?.[1]);
+        if (!Number.isFinite(boardId)) return;
+        const responseText = e.detail.xhr?.responseText ?? "";
+        const gone = new Set(
+            (responseText.match(/data-removed-task-ids="([^"]*)"/)?.[1] ?? "").split(",").map(Number)
+        );
+        for (const key of Object.keys(store.drafts)) {
+            if (gone.has(Number(key))) delete store.drafts[key];
+        }
+        if (gone.has(Number(store.ui.openTaskId))) store.ui.openTaskId = null;
+        if (gone.has(Number(store.ui.lastEdited?.taskId))) store.ui.lastEdited = null;
+        if (Number(store.ui.activeBoardId) === boardId) {
+            const next = Number(
+                new DOMParser().parseFromString(responseText, "text/html")
+                    .querySelector("[data-board-id]")?.dataset.boardId
+            );
+            if (Number.isFinite(next)) {
+                store.ui.activeBoardId = next;
+                refreshBoard();
+            }
+        }
     });
 
     Alpine.data("notesDrawer", () => ({
@@ -369,7 +431,15 @@ document.addEventListener("alpine:initializing", () => {
         },
         markEdited(text) {
             if (this.openId == null) return;
-            mb().ui.lastEdited = { taskId: this.openId, at: Date.now(), snippet: snippet(text) };
+            // the drawer only ever opens from the board being viewed (cards, rows,
+            // or a banner reopen that switched boards first), so the task's board
+            // is the active one — the banner uses it to jump back across boards
+            mb().ui.lastEdited = {
+                taskId: this.openId,
+                boardId: mb().ui.activeBoardId,
+                at: Date.now(),
+                snippet: snippet(text),
+            };
         },
 
         // one htmx event per panel swap: apply draft rules, then (if this open is
@@ -389,13 +459,15 @@ document.addEventListener("alpine:initializing", () => {
             this.onPanelReady();
         },
 
-        // first board paint: reopen the note we were in, or put focus back in a column
+        // first board paint: reopen the note we were in, or put focus back in a
+        // column. every view marks its rows with data-task-id (card, table, list)
+        // so the resume works no matter which view is persisted
         onBoardSettle() {
             if (this.resumeTried) return;
             this.resumeTried = true;
             const ui = mb().ui;
             const id = ui.openTaskId;
-            if (id != null && document.getElementById("card-" + id)) {
+            if (id != null && document.querySelector(`[data-task-id="${id}"]`)) {
                 this.onOpen(Number(id), true);
                 return;
             }
@@ -641,8 +713,10 @@ document.addEventListener("alpine:initializing", () => {
         get title() {
             const le = this.lastEdited;
             if (!le) return "";
-            const card = document.getElementById("card-" + le.taskId);
-            return card?.querySelector(".card-title")?.textContent ?? "";
+            // the task's title only exists in the DOM of the board that renders
+            // it; rows in every view carry data-task-id + .card-title
+            const host = document.querySelector(`[data-task-id="${le.taskId}"]`);
+            return host?.querySelector(".card-title")?.textContent ?? "";
         },
         get text() {
             const le = this.lastEdited;
@@ -660,9 +734,15 @@ document.addEventListener("alpine:initializing", () => {
         },
         get visible() { return !!this.lastEdited && !!this.title && !this.$store.notes.openId; },
         reopen() {
-            const id = this.lastEdited?.taskId;
-            if (id == null) return;
-            this.$dispatch("notes-open", { id: Number(id), resume: true });
+            const le = this.lastEdited;
+            if (le?.taskId == null) return;
+            // the note may live on another board: switch first so its card/row
+            // is on screen when the drawer opens
+            if (le.boardId != null && this.$store.mb.ui.activeBoardId !== le.boardId) {
+                this.$store.mb.ui.activeBoardId = le.boardId;
+                this.$store.mb.refresh();
+            }
+            this.$dispatch("notes-open", { id: Number(le.taskId), resume: true });
         },
         dismiss() { this.$store.mb.ui.lastEdited = null; },
     }));

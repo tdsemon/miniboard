@@ -71,25 +71,112 @@ body {
     gap: 0.25rem;
 }
 
-.projects a {
+/* Board list: each item is a button (an in-app switch, not a navigation);
+   double-click the name to rename, hover reveals the delete X */
+.project-item {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+}
+
+.project-btn {
+    flex: 1;
     padding: 0.5rem 0.75rem;
     border-radius: 6px;
+    border: none;
+    background: transparent;
     color: var(--text-muted);
-    text-decoration: none;
+    text-align: left;
+    font-family: inherit;
     font-size: 0.9rem;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
 }
 
-.projects a:hover {
+.project-btn:hover {
     background-color: var(--surface-muted);
     color: var(--text-main);
 }
 
-.projects a.active {
+.project-btn.active {
     background-color: var(--accent-soft);
     color: var(--accent);
+}
+
+.project-x {
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    line-height: 1;
+    padding: 0.25rem 0.4rem;
+    border-radius: 6px;
+    cursor: pointer;
+    visibility: hidden;
+}
+
+.project-item:hover .project-x,
+.project-x:focus-visible {
+    visibility: visible;
+}
+
+.project-x:hover {
+    color: var(--text-main);
+    background: var(--surface-muted);
+}
+
+.board-rename {
+    display: flex;
+    gap: 0.25rem;
+    flex: 1;
+    padding-left: 0.75rem;
+}
+
+.board-rename input {
+    flex: 1;
+    min-width: 0;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.85rem;
+}
+
+.board-rename input:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.board-rename button {
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: var(--on-dark);
+    border-radius: 6px;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.board-add input {
+    width: 100%;
+    padding: 0.4rem 0.75rem;
+    border: 1px dashed var(--border-color);
+    border-radius: 6px;
+    background: transparent;
+    font-family: inherit;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.board-add input::placeholder {
+    color: var(--text-muted);
+}
+
+.board-add input:focus {
+    outline: none;
+    border-color: var(--accent);
+    border-style: solid;
+    color: var(--text-main);
 }
 
 /* Main Content Area */
@@ -740,4 +827,140 @@ body {
 
 .toast-show {
     opacity: 1;
+}
+/* Table view: one sortable table of the current board. The Status cell is the
+   same move select as the card, rendered visible (no sr-only). */
+.table-wrap {
+    overflow-x: auto;
+}
+
+.task-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.task-table th {
+    text-align: left;
+    padding: 0.4rem 0.75rem;
+    border-bottom: 2px solid var(--border-color);
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+.sort-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
+    cursor: pointer;
+}
+
+.sort-btn:hover {
+    color: var(--accent);
+}
+
+.task-table td {
+    padding: 0.55rem 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
+}
+
+.task-table tr:hover td {
+    background: var(--surface-muted);
+}
+
+.title-cell {
+    min-width: 14rem;
+}
+
+.note-cell {
+    white-space: nowrap;
+    color: var(--text-muted);
+}
+
+.has-note {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.note-when {
+    margin-left: 0.4rem;
+    font-size: 0.75rem;
+}
+
+.order-cell {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.row-actions {
+    white-space: nowrap;
+    text-align: right;
+}
+
+.row-actions .notes-btn {
+    margin-left: 0;
+    margin-right: 0.35rem;
+}
+
+.empty-view {
+    padding: 1.25rem 0.75rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+/* List view: compact rows grouped under column headings */
+.task-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.list-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.4rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+
+.list-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.35rem;
+    background: var(--bg-main);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    transition: border-color 0.2s;
+}
+
+.list-row:hover {
+    border-color: var(--accent);
+}
+
+.list-title {
+    flex: 1;
+    min-width: 0;
+}
+
+.list-note {
+    display: inline-block;
+}
+
+.list-row .notes-btn {
+    margin-left: 0;
 }

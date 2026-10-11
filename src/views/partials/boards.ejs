@@ -1,0 +1,33 @@
+<!-- Sidebar board list: swapped wholesale by htmx (load, add, rename, delete).
+     The active marker reads the persisted Alpine store, so a swap can't lose
+     which board is open. data-removed-task-ids only rides on the delete
+     response so the client can drop those tasks' drafts. -->
+<nav id="boards" class="projects"<% if (locals.removedTaskIds) { %> data-removed-task-ids="<%= removedTaskIds %>"<% } %>>
+    <% boards.forEach((b) => { %>
+        <div class="project-item">
+            <button type="button" class="project-btn" data-board-id="<%= b.id %>"
+                x-show="editingId !== <%= b.id %>"
+                :class="$store.mb.ui.activeBoardId === <%= b.id %> && 'active'"
+                @click="pickBoard(<%= b.id %>)"
+                @dblclick="editingId = <%= b.id %>"><%= b.name %></button>
+            <template x-if="editingId === <%= b.id %>">
+                <form class="board-rename" hx-post="/boards/<%= b.id %>" hx-target="#boards" hx-swap="outerHTML"
+                    @submit="editingId = null" @click.outside="editingId = null">
+                    <input name="name" value="<%= b.name %>" required maxlength="60"
+                        x-init="$nextTick(() => { $el.focus(); $el.select(); })"
+                        @keydown.escape.stop="editingId = null">
+                    <button type="submit">Save</button>
+                </form>
+            </template>
+            <% if (boards.length > 1) { %>
+                <!-- last board is the app: no delete button, and the route 400s as a backstop -->
+                <button type="button" class="project-x" title="Delete board" aria-label="Delete board <%= b.name %>"
+                    hx-delete="/boards/<%= b.id %>" hx-target="#boards" hx-swap="outerHTML"
+                    hx-confirm="Delete this board and all its tasks?">×</button>
+            <% } %>
+        </div>
+    <% }) %>
+    <form class="board-add" hx-post="/boards" hx-target="#boards" hx-swap="outerHTML" @htmx:after-request="$el.reset()">
+        <input name="name" placeholder="+ New board" required maxlength="60">
+    </form>
+</nav>

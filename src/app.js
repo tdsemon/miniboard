@@ -2,6 +2,7 @@ import express from "express";
 import path from "node:path";
 import { fileURLToPath } from 'url';
 import boardRoutes from "./routes/board.js";
+import boardsRoutes from "./routes/boards.js";
 import taskRoutes from "./routes/tasks.js";
 import noteRoutes from "./routes/notes.js";
 
@@ -23,6 +24,7 @@ app.use(express.static(path.join(__dirname, "..", "public")))
 app.get("/", (req,res)=> res.render('index'));
 
 app.use(boardRoutes)
+app.use(boardsRoutes)
 app.use(taskRoutes)
 app.use(noteRoutes)
 

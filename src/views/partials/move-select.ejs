@@ -1,0 +1,23 @@
+<!-- Shared by the card (board view) and the table/list rows. Board-view calls
+     omit view: the select is sr-only (revealed on card focus) and the response
+     is the same column fragments the drag path returns. Table/list calls pass
+     their view, so the POST body tells the server to re-render that view into
+     #board instead. q is read from the search box at request time. -->
+<% if (!locals.view) { %>
+    <!-- sr-only: keyboard users reach it by Tab; :focus-within on the card
+         reveals it (see .move-select rules in style.css). alt+arrow is the
+         no-mouse route, described here so the select carries the hint. -->
+    <span class="sr-only" id="move-hint-<%= task.id %>">Hold Alt and press the up or down arrow to move this card within the column.</span>
+<% } %>
+<label class="sr-only" for="move-<%= task.id %>">Move <%= task.title %> to column</label>
+<select class="move-select<%= locals.view ? "" : " sr-only" %>" id="move-<%= task.id %>" name="toColumn"
+    <% if (!locals.view) { %>aria-describedby="move-hint-<%= task.id %>"<% } %>
+    hx-post="/tasks/<%= task.id %>/move"
+    hx-trigger="change"
+    hx-target="<%= target %>"
+    hx-swap="<%= swap %>"
+    <% if (locals.view) { %>hx-vals='js:({view: "<%= view %>", sort: "<%= sort %>", dir: "<%= dir %>", q: document.querySelector(".search")?.value ?? ""})'<% } %>>
+    <% columns.forEach(c => { %>
+        <option value="<%= c.key %>"<%= c.key === task.status ? " selected disabled" : "" %>><%= c.label %></option>
+    <% }) %>
+</select>
