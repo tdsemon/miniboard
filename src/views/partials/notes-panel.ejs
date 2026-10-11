@@ -1,14 +1,32 @@
-<div class="notes-backdrop" x-show="open" x-cloak x-transition.opacity @click="closeIt()"></div>
-<aside class="notes-panel" x-show="open" x-cloak x-transition
+<!-- no x-cloak: this markup only arrives via htmx swap, and Alpine's mutation
+     observer initializes it in a microtask before the next paint (so x-cloak
+     can't prevent a flash — it would just outlive notes.js's afterSettle hook
+     and leave the textarea display:none when we try to restore the cursor). -->
+<div class="notes-backdrop" x-show="open" x-transition.opacity @click="closeIt()"></div>
+<aside class="notes-panel" x-show="open" x-transition
     role="dialog" aria-labelledby="notes-title">
     <div class="notes-head">
         <h2 id="notes-title"><%= task.title %></h2>
         <button type="button" class="notes-close" @click="closeIt()" aria-label="Close notes">×</button>
     </div>
     <form class="notes-form" onsubmit="return false">
+        <!-- rule 5: inline prompt, not a modal. restore is the focused default
+             (notes.js focuses .draft-restore once the panel settles). -->
+        <div class="draft-bar" x-show="prompt" role="status">
+            <span x-show="prompt === 'prompt-restore'">You have a local draft of this note that isn't on the server yet.</span>
+            <span x-show="prompt === 'prompt-server-reset'">Server was reset — your local draft is newer than the server's copy.</span>
+            <button type="button" class="draft-restore" @click="restoreDraft()">Restore</button>
+            <button type="button" class="draft-discard" @click="discardDraft()">Discard</button>
+        </div>
+        <div class="draft-bar draft-notice" x-show="notice" role="status">
+            newer version on server, local draft kept
+        </div>
+
         <label class="sr-only" for="note-<%= task.id %>">Note for <%= task.title %></label>
+        <!-- readonly while a prompt is up: typing would overwrite the draft the prompt is about -->
         <textarea class="notes-textarea" id="note-<%= task.id %>" name="note"
             placeholder="Write a note..."
+            :readonly="!!prompt"
             hx-post="/tasks/<%= task.id %>/notes"
             hx-trigger="input changed delay:800ms, save-now from:closest form"
             hx-target="#note-status-swap"
@@ -24,7 +42,7 @@
                 hx-swap="innerHTML"
                 hx-trigger="click"
                 hx-sync="closest form:queue last">Save</button>
-            <button type="button" class="notes-retry" x-show="status === 'error'" x-cloak
+            <button type="button" class="notes-retry" x-show="status === 'error'"
                 @click="retry()">Retry</button>
             <div class="note-status" aria-live="polite">
                 <span x-show="status === 'editing'">editing…</span>

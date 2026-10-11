@@ -1,4 +1,4 @@
-<div class="card" id="card-<%= task.id %>"
+<div class="card" id="card-<%= task.id %>" tabindex="-1"
     x-init="$store.notes.hasNotes[<%= task.id %>] = <%= task.note ? "true" : "false" %>"
     :class="{ 'card-open': $store.notes.openId === <%= task.id %>, 'card-has-notes': $store.notes.hasNotes[<%= task.id %>] }">
     <p class="card-title"><%= task.title %></p>

@@ -537,6 +537,105 @@ body {
     color: var(--text-muted);
 }
 
+/* Draft prompt bar: inline above the textarea, keyboard reachable (rule 5) */
+.draft-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.5rem 0.6rem;
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    background: var(--accent-soft);
+    font-size: 0.75rem;
+}
+
+.draft-bar span {
+    flex: 1;
+    min-width: 10rem;
+}
+
+.draft-restore,
+.draft-discard {
+    border-radius: 6px;
+    padding: 0.3rem 0.7rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.draft-restore {
+    background: var(--accent);
+    border: 1px solid var(--accent);
+    color: #fff;
+}
+
+.draft-discard {
+    background: #fff;
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+}
+
+.draft-notice {
+    border-color: var(--border-color);
+    background: var(--bg-sidebar);
+    color: var(--text-muted);
+}
+
+.draft-restore:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+/* Continue banner: values come from $store.mb.ui, markup is re-rendered per swap */
+.continue-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    background: var(--accent-soft);
+    font-size: 0.8rem;
+}
+
+.continue-msg {
+    flex: 1;
+    min-width: 0;
+}
+
+.continue-msg strong {
+    font-weight: 600;
+}
+
+.continue-open {
+    background: var(--accent);
+    border: none;
+    border-radius: 6px;
+    color: #fff;
+    padding: 0.3rem 0.75rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.continue-x {
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-muted);
+    padding: 0.15rem 0.5rem;
+    cursor: pointer;
+}
+
+.card:focus-visible,
+.column:focus-visible,
+.continue-open:focus-visible,
+.continue-x:focus-visible,
+.draft-discard:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
 /* Drag & drop (SortableJS classes set in public/dnd.js) */
 .card-ghost {
     opacity: 0.5;

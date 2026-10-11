@@ -1,8 +1,213 @@
 // Alpine side of the notes drawer: status machine, flush-on-close, ticking
-// labels. Every HTTP request goes through htmx (attributes or htmx.ajax);
-// this file only tracks truth from htmx events — never shows "saved" optimistically.
-document.addEventListener("alpine:init", () => {
-    Alpine.store("notes", { openId: null, hasNotes: {} });
+// labels, local drafts and resume state. Every HTTP request goes through htmx
+// (attributes or htmx.ajax); this file only tracks truth from htmx events —
+// never shows "saved" optimistically.
+//
+// DRAFT CONTRACT — the rules, and where each one lives:
+//  1. on every input, write the draft immediately (no debounce; it's local).
+//     baseVersion = the version the textarea was loaded / last saved with.
+//     -> onInput() + draftForInput()            [test: rule 1]
+//  2. on a confirmed server save where the saved text equals the current
+//     textarea text, delete that task's draft. if the user typed more during the
+//     save, keep the draft with the new baseVersion.
+//     -> onAfterRequest() + draftAfterSave()    [test: rule 2]
+//  3. on open of a task's note, compare draft to server (decideDraftAction):
+//       - no draft, or draft.text === server note: nothing to do, drop the stale
+//         draft.
+//       - text differs and draft.baseVersion === server version: show the
+//         restore prompt (restore / discard).
+//       - draft.baseVersion < server version: the server moved on without this
+//         tab's draft (another tab or session). do NOT prompt for restore. leave
+//         the draft in place and show a small "newer version on server, local
+//         draft kept" notice. step 7 turns that into the real conflict UI.
+//       - draft.baseVersion > server version (server restarted, in-memory data
+//         reset): treat as restorable, prompt, and say "server was reset".
+//     -> onPanelReady()                          [test: rule 3]
+//  4. restore = put the draft text into the textarea, status goes dirty, normal
+//     autosave takes over. discard = delete the draft, keep the server text.
+//     -> restoreDraft() / discardDraft()
+//  5. the prompt is a small inline bar inside the drawer above the textarea —
+//     not a modal, not a confirm(). keyboard reachable, restore is the focused
+//     default. -> notes-panel.ejs (.draft-bar)
+// The textarea is readonly while the prompt is up: rules 1 and 2 would otherwise
+// clobber the very draft the prompt is asking about.
+import { decideDraftAction, draftAfterSave, draftForInput, clampCursor, snippet } from "./drafts.js";
+
+// one key per concern, "miniboard:" prefixed. every read/write goes through
+// safeStorage so a blocked or full localStorage degrades to no persistence
+// instead of breaking the app.
+const KEY_UI = "miniboard:ui";
+const KEY_DRAFTS = "miniboard:drafts";
+
+const safeStorage = {
+    getItem(key) {
+        try {
+            const raw = localStorage.getItem(key);
+            if (raw == null) return null;
+            JSON.parse(raw); // corrupt JSON would otherwise throw inside Alpine
+            return raw;
+        } catch {
+            return null;
+        }
+    },
+    setItem(key, value) {
+        try {
+            localStorage.setItem(key, value);
+        } catch {}
+    },
+    removeItem(key) {
+        try {
+            localStorage.removeItem(key);
+        } catch {}
+    },
+};
+
+const writeKey = (key, value) => {
+    try {
+        localStorage.setItem(key, JSON.stringify(value));
+    } catch {}
+};
+
+const mb = () => Alpine.store("mb");
+
+// --- throttled ui capture (~300ms). values land in the store, Alpine's $persist
+// effect does the actual write. ---
+let uiTimer = null;
+let pendingUi = null;
+
+function queueUi(patch) {
+    pendingUi = Object.assign(pendingUi || {}, patch);
+    if (uiTimer) return;
+    uiTimer = setTimeout(() => {
+        uiTimer = null;
+        writeUiPending();
+    }, 300);
+}
+
+function writeUiPending() {
+    const patch = pendingUi;
+    pendingUi = null;
+    const ui = mb()?.ui;
+    if (!patch || !ui) return false;
+    if ("start" in patch) {
+        ui.cursorStart = patch.start;
+        ui.cursorEnd = patch.end;
+    }
+    if ("scroll" in patch) ui.scrollTop = patch.scroll;
+    return true;
+}
+
+function captureCursor() {
+    const ta = document.querySelector(".notes-textarea");
+    if (!ta) return;
+    queueUi({
+        start: clampCursor(ta.selectionStart, ta.value.length),
+        end: clampCursor(ta.selectionEnd, ta.value.length),
+    });
+}
+
+function captureScroll() {
+    const ta = document.querySelector(".notes-textarea");
+    if (!ta) return;
+    queueUi({ scroll: ta.scrollTop });
+}
+
+// snapshot both keys right now (beforeunload can't wait for a scheduled effect)
+function persistNow() {
+    const store = mb();
+    if (!store) return;
+    writeKey(KEY_UI, store.ui);
+    writeKey(KEY_DRAFTS, store.drafts);
+}
+
+const editorHasFocus = () => !!document.activeElement?.closest?.(".notes-panel");
+
+// alpine:initializing (not alpine:init) so $persist from the persist plugin is
+// already registered no matter where the script tags sit; Alpine dispatches
+// both events back-to-back inside start(), before it walks the DOM.
+document.addEventListener("alpine:initializing", () => {
+    Alpine.store("notes", { openId: null, hasNotes: {}, tickNow: Date.now() });
+
+    // persisted state: drafts (taskId -> {text, baseVersion, savedAt}) and the
+    // resume/ui snapshot. $persist writes through safeStorage on every change.
+    Alpine.store("mb", {
+        ui: Alpine.$persist({
+            openTaskId: null,
+            cursorStart: 0,
+            cursorEnd: 0,
+            scrollTop: 0,
+            focusedColumn: null,
+            lastEdited: null, // { taskId, at, snippet } -> continue banner
+        })
+            .as(KEY_UI)
+            .using(safeStorage),
+        drafts: Alpine.$persist({}).as(KEY_DRAFTS).using(safeStorage),
+    });
+
+    // one app-wide ticker: the banner's "time since" reads $store.notes.tickNow
+    setInterval(() => {
+        const notes = Alpine.store("notes");
+        if (notes) notes.tickNow = Date.now();
+    }, 5000);
+
+    // cursor + scroll: document-level so the panel markup stays clean
+    document.addEventListener("selectionchange", () => {
+        const el = document.activeElement;
+        if (el?.classList?.contains("notes-textarea")) captureCursor();
+    });
+    document.addEventListener(
+        "scroll",
+        (e) => {
+            if (e.target?.classList?.contains("notes-textarea")) captureScroll();
+        },
+        true // scroll does not bubble
+    );
+
+    // which column the user was working in (drawer wins on load, see onBoardSettle)
+    document.addEventListener("focusin", (e) => {
+        const col = e.target?.closest?.(".column");
+        const ui = mb()?.ui;
+        if (!col || !ui) return;
+        const key = String(col.id || "").replace(/^column-/, "");
+        if (key && ui.focusedColumn !== key) ui.focusedColumn = key;
+    });
+
+    // two tabs: a draft/ui change elsewhere must not clobber an open editor.
+    // the tab with the drawer open + focused ignores ui; tabs with the drawer
+    // open ignore drafts. everyone else just updates the banner.
+    window.addEventListener("storage", (e) => {
+        if (e.key !== KEY_UI && e.key !== KEY_DRAFTS) return;
+        let incoming;
+        try {
+            incoming = JSON.parse(e.newValue ?? "null");
+        } catch {
+            return;
+        }
+        if (!incoming || typeof incoming !== "object") return;
+        const store = mb();
+        if (!store) return;
+        const prop = e.key === KEY_UI ? "ui" : "drafts";
+        try {
+            if (JSON.stringify(store[prop]) === JSON.stringify(incoming)) return; // already ours: no ping-pong
+        } catch {
+            return;
+        }
+        const drawerOpen = Alpine.store("notes")?.openId != null;
+        if (prop === "drafts" ? drawerOpen : drawerOpen && editorHasFocus()) return;
+        store[prop] = incoming;
+    });
+
+    // deleting a task drops its draft and anything pointing at it
+    document.addEventListener("htmx:after-request", (e) => {
+        const path = e.detail?.elt?.getAttribute?.("hx-delete");
+        if (!path || !e.detail.successful) return;
+        const id = Number(path.match(/\/tasks\/(\d+)/)?.[1]);
+        const store = mb();
+        if (!Number.isFinite(id) || !store) return;
+        if (store.drafts[id]) delete store.drafts[id];
+        if (Number(store.ui.openTaskId) === id) store.ui.openTaskId = null;
+        if (Number(store.ui.lastEdited?.taskId) === id) store.ui.lastEdited = null;
+    });
 
     Alpine.data("notesDrawer", () => ({
         open: false,
@@ -11,9 +216,20 @@ document.addEventListener("alpine:init", () => {
         status: "idle", // idle | editing | dirty | saving | saved | error
         seq: 0,         // bumps on every keystroke
         sentSeq: -1,    // seq captured when a request went out (stale-response guard)
+        sentText: "",   // text captured when a request went out (rule 2)
         savedAt: null,
         tickNow: Date.now(),
         timer: null,
+
+        // draft + resume
+        baseVersion: 0,      // version the textarea was loaded / last saved with
+        prompt: null,        // null | "prompt-restore" | "prompt-server-reset"
+        notice: false,       // keep-with-notice (server moved on)
+        panelSeq: 0,         // bumped per open, so each panel load settles once
+        settledSeq: -1,
+        resume: false,       // this open should restore cursor/scroll/focus
+        resumeAfterPrompt: false, // ...once the user picks restore/discard
+        resumeTried: false,  // page-load resume already ran
 
         get savedLabel() {
             if (!this.savedAt) return "saved";
@@ -28,9 +244,13 @@ document.addEventListener("alpine:init", () => {
         },
 
         // opening another card while dirty: flush the current note first
-        onOpen(id) {
+        onOpen(id, resume = false) {
+            this.resume = !!resume;
             if (this.open && this.openId !== id && this.hasUnsaved()) {
-                this.flush().then((ok) => { if (ok) this.finishOpen(id); });
+                this.flush().then((ok) => {
+                    if (ok) this.finishOpen(id);
+                    else this.resume = false;
+                });
                 return;
             }
             this.finishOpen(id);
@@ -41,10 +261,16 @@ document.addEventListener("alpine:init", () => {
             this.status = "idle";
             this.seq = 0;
             this.sentSeq = -1;
+            this.sentText = "";
             this.savedAt = null;
+            this.baseVersion = 0;
+            this.prompt = null;
+            this.notice = false;
+            this.panelSeq++;
             this.stopTick();
             this.open = true;
             Alpine.store("notes").openId = id;
+            mb().ui.openTaskId = id;
             htmx.ajax("GET", `/tasks/${id}/notes`, { target: "#notes-drawer", swap: "innerHTML" });
         },
 
@@ -59,6 +285,12 @@ document.addEventListener("alpine:init", () => {
             this.open = false;
             this.openId = null;
             this.status = "idle";
+            this.prompt = null;
+            this.notice = false;
+            this.resume = false;
+            this.resumeAfterPrompt = false;
+            writeUiPending();
+            mb().ui.openTaskId = null;
             this.stopTick();
             Alpine.store("notes").openId = null;
             this.$nextTick(() => document.getElementById("notes-btn-" + this.lastFocusId)?.focus());
@@ -87,22 +319,160 @@ document.addEventListener("alpine:init", () => {
             if (form) htmx.trigger(form, "save-now");
         },
 
+        // rule 1: every keystroke writes the draft straight away
         onInput() {
+            const firstDirtyAfterSave = this.savedAt !== null && ["saved", "editing"].includes(this.status);
             this.seq++;
             if (this.status !== "saving") this.status = "dirty";
+
+            const ta = document.querySelector(".notes-textarea");
+            if (ta && this.openId != null) mb().drafts[this.openId] = draftForInput(ta.value, this.baseVersion);
+            if (firstDirtyAfterSave) this.markEdited(ta ? ta.value : "");
         },
         onFocus() {
             if (this.status === "idle" || this.status === "saved") this.status = "editing";
+        },
+        markEdited(text) {
+            if (this.openId == null) return;
+            mb().ui.lastEdited = { taskId: this.openId, at: Date.now(), snippet: snippet(text) };
+        },
+
+        // one htmx event per panel swap: apply draft rules, then (if this open is
+        // a resume) put the cursor and scroll back.
+        onAfterSettle(e) {
+            const target = e.detail?.target;
+            if (!target) return;
+            if (target.id === "board") {
+                this.onBoardSettle();
+                return;
+            }
+            if (target.id !== "notes-drawer") return;
+            if (this.settledSeq === this.panelSeq) return; // same swap, settled twice
+            const ta = document.querySelector(".notes-textarea");
+            if (!ta || ta.id !== "note-" + this.openId) return; // stale response
+            this.settledSeq = this.panelSeq;
+            this.onPanelReady();
+        },
+
+        // first board paint: reopen the note we were in, or put focus back in a column
+        onBoardSettle() {
+            if (this.resumeTried) return;
+            this.resumeTried = true;
+            const ui = mb().ui;
+            const id = ui.openTaskId;
+            if (id != null && document.getElementById("card-" + id)) {
+                this.onOpen(Number(id), true);
+                return;
+            }
+            if (id != null) ui.openTaskId = null; // task deleted while we were away
+            this.restoreColumnFocus();
+        },
+        restoreColumnFocus() {
+            const key = mb().ui.focusedColumn;
+            if (!key) return;
+            const col = document.getElementById("column-" + key);
+            if (!col) return;
+            (col.querySelector(".card") || col).focus({ preventScroll: true });
+        },
+
+        onPanelReady() {
+            const ta = document.querySelector(".notes-textarea");
+            if (!ta) return;
+
+            const serverNote = ta.value;
+            const serverVersion = Number(document.getElementById("note-version")?.value ?? 0);
+            this.baseVersion = serverVersion;
+            this.prompt = null;
+            this.notice = false;
+
+            // rule 3
+            const drafts = mb().drafts;
+            const draft = drafts[this.openId];
+            const action = decideDraftAction(draft, serverNote, serverVersion);
+            if (action === "none") {
+                if (draft) delete drafts[this.openId];
+            } else if (action === "keep-with-notice") {
+                this.notice = true;
+            } else {
+                this.prompt = action;
+            }
+
+            if (this.resume) {
+                this.resume = false;
+                if (this.prompt) this.resumeAfterPrompt = true; // offsets mean more after restore
+                else this.applyResume();
+            }
+            if (this.prompt) this.$nextTick(() => document.querySelector(".draft-restore")?.focus());
+        },
+
+        // rule 4
+        restoreDraft() {
+            const ta = document.querySelector(".notes-textarea");
+            const draft = mb().drafts[this.openId];
+            if (!ta || !draft) {
+                this.prompt = null;
+                this.afterPrompt();
+                return;
+            }
+            this.baseVersion = Number(document.getElementById("note-version")?.value ?? 0);
+            ta.value = draft.text;
+            draft.baseVersion = this.baseVersion; // textarea now carries the server version
+            this.prompt = null;
+            ta.dispatchEvent(new Event("input", { bubbles: true })); // dirty + autosave take over
+            this.afterPrompt();
+        },
+        discardDraft() {
+            const drafts = mb().drafts;
+            if (drafts[this.openId]) delete drafts[this.openId]; // server text stays as it is
+            this.prompt = null;
+            this.afterPrompt();
+        },
+        afterPrompt() {
+            if (this.resumeAfterPrompt) {
+                this.resumeAfterPrompt = false;
+                this.applyResume();
+                return;
+            }
+            document.querySelector(".notes-textarea")?.focus();
+        },
+
+        // cursor + scroll, only ever called after the panel has settled and Alpine
+        // has initialised it (x-cloak/x-show are off by the time nextTick runs)
+        applyResume() {
+            this.$nextTick(() => {
+                const ta = document.querySelector(".notes-textarea");
+                if (!ta) return;
+                const ui = mb().ui;
+                const len = ta.value.length;
+                ta.setSelectionRange(clampCursor(ui.cursorStart, len), clampCursor(ui.cursorEnd, len));
+                ta.focus();
+                ta.scrollTop = ui.scrollTop; // last: focus() can scroll the control
+            });
         },
 
         onBeforeRequest(e) {
             if (!this.isNoteRequest(e.detail?.elt)) return;
             this.status = "saving";
             this.sentSeq = this.seq;
+            const ta = document.querySelector(".notes-textarea");
+            this.sentText = ta ? ta.value : "";
         },
         onAfterRequest(e) {
             if (!this.isNoteRequest(e.detail?.elt)) return;
             if (!e.detail.successful) { this.status = "error"; this.stopTick(); return; }
+
+            const ta = document.querySelector(".notes-textarea");
+            const savedVersion = Number(document.getElementById("note-version")?.value ?? this.baseVersion);
+            this.baseVersion = savedVersion;
+
+            // rule 2
+            const drafts = mb().drafts;
+            if (ta) {
+                const next = draftAfterSave(drafts[this.openId], this.sentText, ta.value, savedVersion);
+                if (next) drafts[this.openId] = next;
+                else if (drafts[this.openId]) delete drafts[this.openId];
+            }
+
             // user typed after this request went out: newer text is not saved yet
             if (this.seq !== this.sentSeq) { this.status = "dirty"; return; }
             this.status = "saved";
@@ -110,6 +480,7 @@ document.addEventListener("alpine:init", () => {
             this.tickNow = this.savedAt;
             this.startTick();
             this.syncHasNote();
+            this.markEdited(ta ? ta.value : ""); // lastEdited on every successful save
         },
         onError(e) {
             if (e?.detail?.elt && !this.isNoteRequest(e.detail.elt)) return;
@@ -128,7 +499,44 @@ document.addEventListener("alpine:init", () => {
             if (this.timer) { clearInterval(this.timer); this.timer = null; }
         },
         onBeforeUnload(e) {
+            const hadPendingUi = uiTimer !== null;
+            writeUiPending();
+            if (hadPendingUi || this.hasUnsaved()) persistNow();
             if (this.hasUnsaved()) { e.preventDefault(); e.returnValue = ""; }
         },
+    }));
+
+    // continue banner — lives inside #board so htmx swaps recreate it, but every
+    // value comes from the persisted store, never from server HTML. titles are
+    // read from the card in the DOM and rendered with x-text only.
+    Alpine.data("continueBanner", () => ({
+        get lastEdited() { return this.$store.mb.ui.lastEdited; },
+        get title() {
+            const le = this.lastEdited;
+            if (!le) return "";
+            const card = document.getElementById("card-" + le.taskId);
+            return card?.querySelector(".card-title")?.textContent ?? "";
+        },
+        get text() {
+            const le = this.lastEdited;
+            if (!le) return "";
+            return snippet(this.$store.mb.drafts[le.taskId]?.text ?? le.snippet ?? "");
+        },
+        get when() {
+            const le = this.lastEdited;
+            if (!le) return "";
+            const s = Math.max(0, Math.round((this.$store.notes.tickNow - (le.at ?? 0)) / 1000));
+            if (s < 60) return `${s}s ago`;
+            const m = Math.floor(s / 60);
+            if (m < 60) return `${m}m ago`;
+            return `${Math.floor(m / 60)}h ago`;
+        },
+        get visible() { return !!this.lastEdited && !!this.title && !this.$store.notes.openId; },
+        reopen() {
+            const id = this.lastEdited?.taskId;
+            if (id == null) return;
+            this.$dispatch("notes-open", { id: Number(id), resume: true });
+        },
+        dismiss() { this.$store.mb.ui.lastEdited = null; },
     }));
 });

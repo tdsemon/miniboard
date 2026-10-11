@@ -9,7 +9,12 @@
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/dist/Sortable.min.js"></script>
     <script src="/dnd.js"></script>
-    <script src="/notes.js"></script>
+    <!-- notes.js listens on alpine:initializing, which Alpine fires after the
+         persist plugin's alpine:init handler, so tag order here is not
+         load-bearing — but keep these as defer/module scripts so they run
+         before Alpine's start(). -->
+    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/persist@3.x.x/dist/cdn.min.js"></script>
+    <script type="module" src="/notes.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
 </head>
@@ -57,15 +62,16 @@
         Alpine (notesDrawer) owns the status machine; htmx owns every request. -->
    <div id="notes-drawer"
        x-data="notesDrawer()"
-       @notes-open.window="onOpen($event.detail.id)"
+       @notes-open.window="onOpen($event.detail.id, $event.detail.resume)"
        @notes-close.window="closeIt()"
        @notes-close-force.window="forceClose()"
        @keydown.escape.window="open && closeIt()"
        @htmx:before-request="onBeforeRequest($event)"
        @htmx:after-request="onAfterRequest($event)"
+       @htmx:afterSettle.window="onAfterSettle($event)"
        @htmx:response-error="onError($event)"
        @htmx:send-error="onError($event)"
-       @beforeunload="onBeforeUnload($event)">
+       @beforeunload.window="onBeforeUnload($event)">
    </div>
     
     

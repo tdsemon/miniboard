@@ -32,7 +32,7 @@ test("move route response shape", async (t) => {
         assert.equal((html.match(/id="column-planned"/g) ?? []).length, 1);
         assert.equal((html.match(/id="column-done"/g) ?? []).length, 1);
         assert.equal((html.match(/hx-swap-oob/g) ?? []).length, 1);
-        // oob attr sits on the destination section
-        assert.match(html, /<section class="column" id="column-done" hx-swap-oob="true">/);
+        // oob attr sits on the destination section (sections also carry tabindex="-1")
+        assert.match(html, /<section class="column" id="column-done"[^>]*hx-swap-oob="true">/);
     });
 });
