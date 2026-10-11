@@ -6,16 +6,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Miniboard</title>
     <link rel="stylesheet" href="/style.css">
-    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/dist/Sortable.min.js"></script>
+    <!-- vendored: pinned copies in /public/vendor, served by express.static
+         (no CDN — jsdelivr started serving these as text/plain/nosniff). -->
+    <script src="/vendor/htmx.min.js"></script>
+    <script src="/vendor/Sortable.min.js"></script>
     <script src="/dnd.js"></script>
     <!-- notes.js listens on alpine:initializing, which Alpine fires after the
          persist plugin's alpine:init handler, so tag order here is not
          load-bearing — but keep these as defer/module scripts so they run
          before Alpine's start(). -->
-    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/persist@3.x.x/dist/cdn.min.js"></script>
+    <script defer src="/vendor/alpine-persist.min.js"></script>
     <script type="module" src="/notes.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script defer src="/vendor/alpine.min.js"></script>
 
 </head>
 <body>

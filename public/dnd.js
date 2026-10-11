@@ -3,6 +3,15 @@
 // MutationObserver re-runs init on every htmx-swapped column, and the
 // cleanup callback destroys the old Sortable instance.
 document.addEventListener("alpine:init", () => {
+    // A missing library should cost us drag-and-drop, not the whole page:
+    // skip registering the directive and let the other alpine directives run.
+    if (typeof Sortable === "undefined") {
+        console.error(
+            "SortableJS is missing — drag-and-drop is disabled. " +
+            "Check that /vendor/Sortable.min.js loads (public/vendor/, served by express.static)."
+        );
+        return;
+    }
     Alpine.directive("sortable", (el, {}, { cleanup }) => {
         const sortable = Sortable.create(el, {
             group: "miniboard",          // shared: drag across columns + reorder
