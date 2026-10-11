@@ -48,7 +48,7 @@ function queueMove(evt) {
         .then(() => {
             if (myGen !== gen) return; // queue was cleared by a failure
             return htmx.ajax("POST", `/tasks/${id}/move`, {
-                target: evt.to.closest(".column"),
+                target: evt.from.closest(".column"),
                 swap: "outerHTML",
                 values: { toColumn, toIndex: String(toIndex), ...(forceFail ? { forceFail: "1" } : {}) },
             });

@@ -10,14 +10,17 @@ const NEXT = {
 
 }
 
-const renderColumn = (res, key, oob = false) =>
+const renderPartial = (res, name, data) =>
     new Promise((resolve, reject) => {
-        res.render("partials/column", {
-            col: columns.find((c) => c.key === key),
-            tasks: getTask(),
-            columns,
-            oob
-        }, (err, html) => (err ? reject(err) : resolve(html)));
+        res.render(name, data, (err, html) => (err ? reject(err) : resolve(html)));
+    });
+
+const renderColumn = (res, key, oob = false) =>
+    renderPartial(res, "partials/column", {
+        col: columns.find((c) => c.key === key),
+        tasks: getTask(),
+        columns,
+        oob
     });
 
 router.get("/board", (req, res) => {
@@ -52,16 +55,20 @@ router.post("/tasks/:id/move", async (req,res) => {
         column = NEXT[task.status];
         index = tasksInColumn(column).length;
     } else {
-        index = Number(rawIndex);
+        index = rawIndex === undefined ? tasksInColumn(column).length : Number(rawIndex);
         if (!Number.isInteger(index)) return res.status(400).send("");
     }
 
     const result = moveTask(req.params.id, column, index);
     if (!result.ok) return res.status(result.reason === "not-found" ? 404 : 400).send("");
 
-    let out = "";
-    if (result.fromColumn !== result.toColumn) out += await renderColumn(res, result.fromColumn, true);
-    out += await renderColumn(res, result.toColumn);
+    // contract: primary fragment = the column the card came FROM (clients always
+    // target it), OOB = the column it went TO. One shape serves drag, → button
+    // and the keyboard select alike.
+    let out = await renderColumn(res, result.fromColumn);
+    if (result.fromColumn !== result.toColumn) out += await renderColumn(res, result.toColumn, true);
+    const label = columns.find((c) => c.key === result.toColumn).label;
+    out += await renderPartial(res, "partials/announce", { title: result.task.title, label });
     res.send(out);
 })
 

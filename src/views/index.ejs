@@ -39,7 +39,9 @@
             >
 
         </header>
-        
+
+        <div id="move-status" class="sr-only" role="status" aria-live="polite"></div>
+
         <div id="board" x-show="view === 'board'" class="board-wrap" hx-get="/board" hx-trigger="load" hx-swap="innerHTML">
             <span>Loading board......</span>
         </div>
