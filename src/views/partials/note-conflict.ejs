@@ -1,0 +1,5 @@
+<!-- 409 body. htmx does not swap error responses, so notes.js parses this out
+     of xhr.responseText (textContent un-escapes the note for us). -->
+<div id="note-conflict" hidden
+    data-version="<%= version %>"
+    data-updated-at="<%= updatedAt ?? "" %>"><%= note %></div>

@@ -56,6 +56,35 @@ test("notes routes", async (t) => {
         assert.ok(html.includes("&lt;b&gt;bold&lt;/b&gt;"));
     });
 
+    await t.test("stale version -> 409 with the server's text escaped", async () => {
+        const seed = await post(base, "/tasks/3/notes", "note=%3Cb%3Emine%3C%2Fb%3E&version=0");
+        assert.equal(seed.status, 200);
+
+        const r = await post(base, "/tasks/3/notes", "note=theirs&version=0");
+        assert.equal(r.status, 409);
+        const html = await r.text();
+        assert.match(html, /id="note-conflict"[^>]*data-version="1"/);
+        assert.ok(html.includes("&lt;b&gt;mine&lt;/b&gt;"));
+        assert.ok(!html.includes("<b>mine</b>"));
+        // the conflict changed nothing on the server
+        assert.equal(getNote(3).note, "<b>mine</b>");
+        assert.equal(getNote(3).version, 1);
+    });
+
+    await t.test("missing or non-numeric version -> 400", async () => {
+        assert.equal((await post(base, "/tasks/3/notes", "note=x")).status, 400);
+        assert.equal((await post(base, "/tasks/3/notes", "note=x&version=abc")).status, 400);
+        assert.equal((await post(base, "/tasks/3/notes", "note=x&version=")).status, 400);
+        assert.equal(getNote(3).version, 1); // still the seeded save
+    });
+
+    await t.test("notes/current returns the server copy as a fragment", async () => {
+        const html = await (await fetch(`${base}/tasks/3/notes/current`)).text();
+        assert.match(html, /id="note-current"[^>]*data-version="1"/);
+        assert.ok(html.includes("&lt;b&gt;mine&lt;/b&gt;"));
+        assert.equal((await fetch(`${base}/tasks/999/notes/current`)).status, 404);
+    });
+
     await t.test("unknown id: panel and save are 404", async () => {
         assert.equal((await fetch(`${base}/tasks/999/notes`)).status, 404);
         assert.equal((await post(base, "/tasks/999/notes", "note=x&version=0")).status, 404);

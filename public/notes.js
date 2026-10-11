@@ -17,9 +17,9 @@
 //       - text differs and draft.baseVersion === server version: show the
 //         restore prompt (restore / discard).
 //       - draft.baseVersion < server version: the server moved on without this
-//         tab's draft (another tab or session). do NOT prompt for restore. leave
-//         the draft in place and show a small "newer version on server, local
-//         draft kept" notice. step 7 turns that into the real conflict UI.
+//         tab's draft (another tab or session). do NOT prompt for restore —
+//         raise the conflict bar (rule 6) with the draft as "mine" and the
+//         server's copy already in the textarea.
 //       - draft.baseVersion > server version (server restarted, in-memory data
 //         reset): treat as restorable, prompt, and say "server was reset".
 //     -> onPanelReady()                          [test: rule 3]
@@ -29,6 +29,20 @@
 //  5. the prompt is a small inline bar inside the drawer above the textarea —
 //     not a modal, not a confirm(). keyboard reachable, restore is the focused
 //     default. -> notes-panel.ejs (.draft-bar)
+//  6. conflict = we lost the version race, from either direction: a 409 on a
+//     save, or an open whose draft is older than the server. status goes
+//     "conflict" (one bar, two sources): autosave stops (textarea is readonly),
+//     the draft is kept, and the bar offers
+//       keep mine  -> version input := server version, status dirty, save-now.
+//                     on an open-conflict the textarea still holds the server
+//                     text, so the draft text is put in first.
+//       take server-> GET /tasks/:id/notes/current (the 409 body can be stale
+//                     by click time), textarea + version := server's, draft
+//                     deleted, status saved.
+//     closing/switching while in conflict never flushes (it would just 409
+//     again); the draft and lastEdited survive for the continue banner, and
+//     beforeunload still warns. -> onError() / enterConflict() / keepMine() /
+//     takeServer()
 // The textarea is readonly while the prompt is up: rules 1 and 2 would otherwise
 // clobber the very draft the prompt is asking about.
 import { decideDraftAction, draftAfterSave, draftForInput, clampCursor, snippet } from "./drafts.js";
@@ -213,7 +227,7 @@ document.addEventListener("alpine:initializing", () => {
         open: false,
         openId: null,
         lastFocusId: null,
-        status: "idle", // idle | editing | dirty | saving | saved | error
+        status: "idle", // idle | editing | dirty | saving | saved | error | conflict
         seq: 0,         // bumps on every keystroke
         sentSeq: -1,    // seq captured when a request went out (stale-response guard)
         sentText: "",   // text captured when a request went out (rule 2)
@@ -224,7 +238,8 @@ document.addEventListener("alpine:initializing", () => {
         // draft + resume
         baseVersion: 0,      // version the textarea was loaded / last saved with
         prompt: null,        // null | "prompt-restore" | "prompt-server-reset"
-        notice: false,       // keep-with-notice (server moved on)
+        conflict: null,      // rule 6: { version, updatedAt, text, source }
+        showServer: false,   // "show server text" toggle on the conflict bar
         panelSeq: 0,         // bumped per open, so each panel load settles once
         settledSeq: -1,
         resume: false,       // this open should restore cursor/scroll/focus
@@ -236,8 +251,26 @@ document.addEventListener("alpine:initializing", () => {
             const s = Math.max(0, Math.round((this.tickNow - this.savedAt) / 1000));
             return s < 5 ? "saved just now" : `saved ${s}s ago`;
         },
+        get conflictLabel() {
+            const c = this.conflict;
+            if (!c) return "";
+            return `server v${c.version}${this.conflictWhen}`;
+        },
+        get conflictWhen() {
+            const at = Date.parse(this.conflict?.updatedAt ?? "");
+            if (!Number.isFinite(at)) return "";
+            const s = Math.max(0, Math.round((this.$store.notes.tickNow - at) / 1000));
+            if (s < 60) return `, ${s}s ago`;
+            const m = Math.floor(s / 60);
+            if (m < 60) return `, ${m}m ago`;
+            return `, ${Math.floor(m / 60)}h ago`;
+        },
         hasUnsaved() {
-            return ["dirty", "saving", "error"].includes(this.status);
+            return ["dirty", "saving", "error", "conflict"].includes(this.status);
+        },
+        // conflict never flushes: the server would just 409 again (rule 6)
+        canFlush() {
+            return this.hasUnsaved() && this.status !== "conflict";
         },
         isNoteRequest(elt) {
             return !!elt?.closest?.(".notes-form");
@@ -246,7 +279,7 @@ document.addEventListener("alpine:initializing", () => {
         // opening another card while dirty: flush the current note first
         onOpen(id, resume = false) {
             this.resume = !!resume;
-            if (this.open && this.openId !== id && this.hasUnsaved()) {
+            if (this.open && this.openId !== id && this.canFlush()) {
                 this.flush().then((ok) => {
                     if (ok) this.finishOpen(id);
                     else this.resume = false;
@@ -265,7 +298,8 @@ document.addEventListener("alpine:initializing", () => {
             this.savedAt = null;
             this.baseVersion = 0;
             this.prompt = null;
-            this.notice = false;
+            this.conflict = null;
+            this.showServer = false;
             this.panelSeq++;
             this.stopTick();
             this.open = true;
@@ -275,7 +309,7 @@ document.addEventListener("alpine:initializing", () => {
         },
 
         async closeIt() {
-            if (this.hasUnsaved()) {
+            if (this.canFlush()) {
                 const ok = await this.flush();
                 if (!ok) return; // stay open, status === "error", retry available
             }
@@ -286,7 +320,8 @@ document.addEventListener("alpine:initializing", () => {
             this.openId = null;
             this.status = "idle";
             this.prompt = null;
-            this.notice = false;
+            this.conflict = null;
+            this.showServer = false;
             this.resume = false;
             this.resumeAfterPrompt = false;
             writeUiPending();
@@ -383,7 +418,6 @@ document.addEventListener("alpine:initializing", () => {
             const serverVersion = Number(document.getElementById("note-version")?.value ?? 0);
             this.baseVersion = serverVersion;
             this.prompt = null;
-            this.notice = false;
 
             // rule 3
             const drafts = mb().drafts;
@@ -392,7 +426,14 @@ document.addEventListener("alpine:initializing", () => {
             if (action === "none") {
                 if (draft) delete drafts[this.openId];
             } else if (action === "keep-with-notice") {
-                this.notice = true;
+                // rule 6, open-source: textarea keeps the server text, the draft
+                // is "mine" and only comes back in if the user keeps it
+                this.enterConflict({
+                    version: serverVersion,
+                    updatedAt: document.getElementById("note-version")?.dataset.updatedAt ?? "",
+                    text: serverNote,
+                    source: "draft",
+                });
             } else {
                 this.prompt = action;
             }
@@ -436,6 +477,75 @@ document.addEventListener("alpine:initializing", () => {
             document.querySelector(".notes-textarea")?.focus();
         },
 
+        // rule 6 — one entry point for both sources. `text` is the server's copy
+        // as of the conflict; `source` says whether the textarea already holds
+        // mine ("save") or still holds the server text ("draft": keep mine pulls
+        // the draft in first).
+        enterConflict({ version, updatedAt, text, source }) {
+            this.prompt = null;
+            this.conflict = {
+                version: Number(version) || 0,
+                updatedAt: updatedAt ?? "",
+                text: String(text ?? ""),
+                source,
+            };
+            this.status = "conflict"; // readonly textarea, no autosave, no flush
+            this.stopTick();
+            // nextTick flushes Alpine's reactivity (x-if mounts the bar), the
+            // frame after that guarantees it is laid out before we focus it
+            this.$nextTick(() => requestAnimationFrame(() =>
+                document.querySelector(".conflict-keep")?.focus()
+            ));
+        },
+        // "keep mine": my text goes out against the server's current version, so
+        // the next save wins instead of 409ing on the stale one again.
+        keepMine() {
+            const ta = document.querySelector(".notes-textarea");
+            const versionEl = document.getElementById("note-version");
+            const conflict = this.conflict;
+            if (!ta || !versionEl || !conflict) return;
+            const draft = mb().drafts[this.openId];
+            // open-conflict: textarea still holds the server text, mine is the draft
+            if (conflict.source === "draft" && draft) ta.value = draft.text;
+            versionEl.value = String(conflict.version);
+            this.baseVersion = conflict.version;
+            this.conflict = null;
+            this.showServer = false;
+            // input = rule 1 writes the draft + status dirty; save-now = the
+            // request that actually overwrites the server
+            ta.dispatchEvent(new Event("input", { bubbles: true }));
+            const form = document.querySelector(".notes-form");
+            if (form) htmx.trigger(form, "save-now");
+        },
+        // "take server": re-fetch (the 409 body can be stale by click time),
+        // then adopt the server's copy wholesale.
+        takeServer() {
+            const id = this.openId;
+            htmx.ajax("GET", `/tasks/${id}/notes/current`, { target: "#note-current-swap", swap: "innerHTML" })
+                .then(() => {
+                    const el = document.getElementById("note-current");
+                    const ta = document.querySelector(".notes-textarea");
+                    const versionEl = document.getElementById("note-version");
+                    if (!el || !ta || !versionEl || this.openId !== id) return;
+                    const version = Number(el.dataset.version) || 0;
+                    ta.value = el.textContent;
+                    versionEl.value = String(version);
+                    this.baseVersion = version;
+                    const drafts = mb().drafts;
+                    if (drafts[id]) delete drafts[id];
+                    this.conflict = null;
+                    this.showServer = false;
+                    this.status = "saved";
+                    this.savedAt = Date.now();
+                    this.tickNow = this.savedAt;
+                    this.startTick();
+                    this.syncHasNote();
+                    this.markEdited(ta.value);
+                    ta.focus();
+                })
+                .catch(() => {}); // still in conflict: the bar stays, retryable
+        },
+
         // cursor + scroll, only ever called after the panel has settled and Alpine
         // has initialised it (x-cloak/x-show are off by the time nextTick runs)
         applyResume() {
@@ -459,7 +569,11 @@ document.addEventListener("alpine:initializing", () => {
         },
         onAfterRequest(e) {
             if (!this.isNoteRequest(e.detail?.elt)) return;
-            if (!e.detail.successful) { this.status = "error"; this.stopTick(); return; }
+            if (!e.detail.successful) {
+                // responseError fires first: a 409 already moved us to "conflict"
+                if (this.status !== "conflict") { this.status = "error"; this.stopTick(); }
+                return;
+            }
 
             const ta = document.querySelector(".notes-textarea");
             const savedVersion = Number(document.getElementById("note-version")?.value ?? this.baseVersion);
@@ -484,6 +598,19 @@ document.addEventListener("alpine:initializing", () => {
         },
         onError(e) {
             if (e?.detail?.elt && !this.isNoteRequest(e.detail.elt)) return;
+            // 409 = we lost the version race. htmx never swaps error responses,
+            // so pull the server's copy out of the body and raise the bar.
+            if (e.detail?.xhr?.status === 409) {
+                const doc = new DOMParser().parseFromString(e.detail.xhr.responseText ?? "", "text/html");
+                const el = doc.getElementById("note-conflict");
+                this.enterConflict({
+                    version: el?.dataset.version,
+                    updatedAt: el?.dataset.updatedAt,
+                    text: el?.textContent,
+                    source: "save",
+                });
+                return;
+            }
             this.status = "error";
             this.stopTick();
         },

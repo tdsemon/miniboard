@@ -1,0 +1,6 @@
+<!-- GET /tasks/:id/notes/current — the server's copy at click time (the 409
+     body may be stale by then). Swapped into #note-current-swap, read with
+     textContent so the note comes back un-escaped. -->
+<div id="note-current" hidden
+    data-version="<%= version %>"
+    data-updated-at="<%= updatedAt ?? "" %>"><%= note %></div>

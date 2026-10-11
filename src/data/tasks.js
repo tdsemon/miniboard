@@ -66,9 +66,21 @@ export const getNote = (id) => {
 
 const NOTE_MAX = 10000;
 
-export const saveNote = (id, text) => {
+// Optimistic concurrency: the client sends the version its textarea was loaded
+// with. A stale base means someone else saved in between — report the conflict
+// and change nothing, so the client can offer keep-mine / take-server.
+export const saveNote = (id, text, baseVersion) => {
     const task = findTask(id);
     if (!task) return { ok: false };
+    if (Number(baseVersion) !== task.version) {
+        return {
+            ok: false,
+            conflict: true,
+            serverNote: task.note,
+            serverVersion: task.version,
+            updatedAt: task.updatedAt,
+        };
+    }
     task.note = String(text ?? "").slice(0, NOTE_MAX);
     task.version += 1;
     task.updatedAt = new Date().toISOString();
