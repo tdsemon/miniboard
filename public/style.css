@@ -5,6 +5,8 @@
     --border-color: #e5e7eb;
     --text-main: #111827;
     --text-muted: #6b7280;
+    --surface-muted: #f3f4f6; /* pills, tabs, hover fills */
+    --on-dark: #fff;          /* text on accent fills and the dark toast */
     --accent: #4f46e5; /* Indigo */
     --accent-soft: #eef2ff;
     --sidebar-width: 260px;
@@ -15,6 +17,10 @@
     --toast-bg: #111827;
     --notes-width: 360px;
     --backdrop-bg: rgba(17, 24, 39, 0.25);
+    --panel-shadow: -8px 0 24px rgba(17, 24, 39, 0.08);
+    --dot-planned: #f59e0b;
+    --dot-progress: var(--accent);
+    --dot-done: #10b981;
 }
 
 * {
@@ -77,7 +83,7 @@ body {
 }
 
 .projects a:hover {
-    background-color: #f3f4f6;
+    background-color: var(--surface-muted);
     color: var(--text-main);
 }
 
@@ -124,7 +130,7 @@ body {
 .tabs {
     display: flex;
     gap: 0.5rem;
-    background: #f3f4f6;
+    background: var(--surface-muted);
     padding: 0.25rem;
     border-radius: 8px;
 }
@@ -187,9 +193,6 @@ body {
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* Utility for Alpine x-show */
-[x-cloak] { display: none !important; }
-
 /* Board */
 .main > .board-wrap {
     padding: 1.5rem;
@@ -237,15 +240,15 @@ body {
     background: var(--text-muted);
 }
 
-.dot-planned { background: #f59e0b; }
-.dot-progress { background: var(--accent); }
-.dot-done { background: #10b981; }
+.dot-planned { background: var(--dot-planned); }
+.dot-progress { background: var(--dot-progress); }
+.dot-done { background: var(--dot-done); }
 
 .count {
     font-size: 0.75rem;
     font-weight: 600;
     color: var(--text-muted);
-    background: #f3f4f6;
+    background: var(--surface-muted);
     border-radius: 999px;
     padding: 0.05rem 0.5rem;
 }
@@ -342,7 +345,7 @@ body {
     padding: 0.6rem;
     font-size: 0.85rem;
     font-weight: 500;
-    color: #fff;
+    color: var(--on-dark);
     cursor: pointer;
     transition: filter 0.2s;
 }
@@ -463,12 +466,21 @@ body {
     width: min(var(--notes-width), 92vw);
     background: var(--bg-main);
     border-left: 1px solid var(--border-color);
-    box-shadow: -8px 0 24px rgba(17, 24, 39, 0.08);
+    box-shadow: var(--panel-shadow);
     z-index: 50;
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
     padding: 1rem;
+}
+
+/* narrow viewports: the drawer is the whole screen, and closing it leaves the
+   board exactly as it was (both layers are x-show'd away, nothing sticky) */
+@media (max-width: 500px) {
+    .notes-panel {
+        width: 100vw;
+        border-left: none;
+    }
 }
 
 .notes-head {
@@ -527,7 +539,7 @@ body {
     background: var(--accent);
     border: none;
     border-radius: 8px;
-    color: #fff;
+    color: var(--on-dark);
     padding: 0.5rem 1rem;
     font-size: 0.85rem;
     cursor: pointer;
@@ -581,11 +593,11 @@ body {
 .draft-restore {
     background: var(--accent);
     border: 1px solid var(--accent);
-    color: #fff;
+    color: var(--on-dark);
 }
 
 .draft-discard {
-    background: #fff;
+    background: var(--bg-main);
     border: 1px solid var(--border-color);
     color: var(--text-muted);
 }
@@ -609,12 +621,12 @@ body {
 .conflict-keep {
     background: var(--accent);
     border: 1px solid var(--accent);
-    color: #fff;
+    color: var(--on-dark);
 }
 
 .conflict-take,
 .conflict-show {
-    background: #fff;
+    background: var(--bg-main);
     border: 1px solid var(--border-color);
     color: var(--text-muted);
 }
@@ -670,7 +682,7 @@ body {
     background: var(--accent);
     border: none;
     border-radius: 6px;
-    color: #fff;
+    color: var(--on-dark);
     padding: 0.3rem 0.75rem;
     font-size: 0.75rem;
     cursor: pointer;
@@ -716,7 +728,7 @@ body {
     bottom: 1.25rem;
     right: 1.25rem;
     background: var(--toast-bg);
-    color: #fff;
+    color: var(--on-dark);
     padding: 0.6rem 1rem;
     border-radius: 8px;
     font-size: 0.85rem;

@@ -1,1 +1,5 @@
-<div id="move-status" class="sr-only" role="status" aria-live="polite"><%= title %> moved to <%= label %></div>
+<!-- aria-live region for every move (drag, select, alt+arrow). Within-column
+     moves carry position/total from the route; cross-column ones name the
+     destination column. locals.* because position/total are only passed for
+     within-column moves (same pattern as column.ejs and oob). -->
+<div id="move-status" class="sr-only" role="status" aria-live="polite"><%= title %> moved to <%= locals.position ? `position ${locals.position} of ${locals.total}` : label %></div>

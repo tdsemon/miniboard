@@ -18,23 +18,23 @@
         in
         {
           default = pkgs.mkShell {
-            # Since HTMX and Alpine are imported via CDN and there is no build step,
-            # Node.js is the only system-level dependency required to run the Express backend.
+            # Client libraries (htmx, Alpine, SortableJS) are vendored under
+            # public/vendor and served by express.static, so there is no build
+            # step — Node.js is the only system-level dependency.
             packages = with pkgs; [
               nodejs_22 # This provides both `node` and `npm`
             ];
 
             shellHook = ''
               echo "====================================================="
-              echo "🚀 HTMX + Alpine Kanban App Environment Loaded"
+              echo "Miniboard dev environment"
               echo "Node version: $(node -v)"
               echo "NPM version: $(npm -v)"
               echo "====================================================="
               echo ""
-              echo "Initial setup commands from the tutorial:"
-              echo "  1. npm init -y"
-              echo "  2. npm install express ejs"
-              echo "  3. npm install --save-dev nodemon"
+              echo "  npm install   # once, after a fresh clone"
+              echo "  npm run dev   # http://localhost:3000"
+              echo "  npm test      # node:test suite"
               echo ""
             '';
           };

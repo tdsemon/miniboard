@@ -14,7 +14,7 @@ test("move route response shape", async (t) => {
     const base = `http://localhost:${server.address().port}`;
     t.after(() => server.close());
 
-    await t.test("same-column move: exactly one section, no OOB", async () => {
+    await t.test("same-column move: exactly one section, no OOB, announces the slot", async () => {
         // seed: planned = [1, 3] — reorder within planned
         const res = await fetch(`${base}/tasks/3/move`, form("toColumn=planned&toIndex=0"));
         assert.equal(res.status, 200);
@@ -22,6 +22,7 @@ test("move route response shape", async (t) => {
         assert.equal((html.match(/<section/g) ?? []).length, 1);
         assert.equal((html.match(/id="column-planned"/g) ?? []).length, 1);
         assert.ok(!html.includes("hx-swap-oob"));
+        assert.match(html, /moved to position 1 of 2/);
     });
 
     await t.test("cross-column move: two sections, source OOB-free, dest carries oob", async () => {

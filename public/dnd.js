@@ -20,7 +20,7 @@ document.addEventListener("alpine:init", () => {
             ghostClass: "card-ghost",    // placeholder left in the target slot
             chosenClass: "card-chosen",  // card being picked up
             dragClass: "card-drag",
-            filter: "button, .card-action, select", // → / X / move-select don't start a drag
+            filter: "button, .card-action, select", // Note / X / move-select don't start a drag
             preventOnFilter: false,                // but their clicks still work
             onEnd(evt) {
                 if (evt.from === evt.to && evt.oldIndex === evt.newIndex) return;
@@ -31,38 +31,32 @@ document.addEventListener("alpine:init", () => {
     });
 });
 
-// Serialize drops: moves are index-based, so they must reach the server in
-// the order they happened on screen (aborting a stale drop would leave the
-// next drop's index computed against state the server never saw).
+// Serialize moves: they are index-based, so they must reach the server in the
+// order they happened on screen (aborting a stale move would leave the next
+// one's index computed against state the server never saw).
 let chain = Promise.resolve();
 
 // Bumped on failure: queued moves captured the old generation and skip
 // themselves, so stale indexes are never replayed against the server.
 let gen = 0;
 
-// id -> { fromKey, oldIndex } for in-flight moves (failure handling keys off it)
-const pending = new Map();
+// ids whose move should put focus back on the card (alt+arrow reorder, so the
+// shortcut chains) instead of the move select (drag and select-initiated moves)
+const focusCardAfter = new Set();
 
 function queueMove(evt) {
     const id = evt.item.id.replace(/^card-/, "");
     const toColumn = evt.to.id.replace(/^col-/, "");
-    const toIndex = evt.newIndex;
     const myGen = gen;
-    // temporary failure injection: open the page as /?fail=1
-    // (test scaffolding, remove in step 8)
-    const forceFail = new URLSearchParams(location.search).has("fail");
-
-    pending.set(id, {});
     chain = chain
         .then(() => {
             if (myGen !== gen) return; // queue was cleared by a failure
             return htmx.ajax("POST", `/tasks/${id}/move`, {
                 target: evt.from.closest(".column"),
                 swap: "outerHTML",
-                values: { toColumn, toIndex: String(toIndex), ...(forceFail ? { forceFail: "1" } : {}) },
+                values: { toColumn, toIndex: String(evt.newIndex) },
             });
         })
-        .then(() => pending.delete(id))
         .catch(() => failMove());
 }
 
@@ -72,21 +66,40 @@ function queueMove(evt) {
 function failMove() {
     gen++;
     chain = Promise.resolve();
-    pending.clear();
+    focusCardAfter.clear();
     htmx.ajax("GET", "/board", { target: "#board", swap: "innerHTML" });
     showToast("Move failed, card put back");
     announce("Move failed, card put back");
 }
 
-// The move response swaps whole columns away, destroying the select that was
-// focused/dragged from. After every successful move, re-focus the moved
-// card's select so keyboard users keep their place. Fires for drag and
-// keyboard moves alike (both go through POST /tasks/:id/move).
+// alt+ArrowUp / alt+ArrowDown on a focused card (or anything inside it) moves
+// it one slot within its column. Same endpoint as drag; the index comes from
+// the DOM, which is where the user is looking. Cards are tabindex="-1", so
+// this is how keyboard users reorder without the move select.
+document.addEventListener("keydown", (e) => {
+    if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+    const card = e.target?.closest?.(".card");
+    const list = card?.closest?.(".cards");
+    if (!card || !list) return;
+    const cards = [...list.children].filter((el) => el.classList.contains("card"));
+    const from = cards.indexOf(card);
+    const to = from + (e.key === "ArrowDown" ? 1 : -1);
+    if (from < 0 || to < 0 || to >= cards.length) return; // already at the edge
+    e.preventDefault();
+    focusCardAfter.add(card.id.replace(/^card-/, ""));
+    queueMove({ item: card, from: list, to: list, newIndex: to });
+});
+
+// The move response swaps whole columns away, destroying whatever was focused
+// in them. Put focus back once the new markup has settled: the card for an
+// alt+arrow reorder, the move select otherwise (drag, dropdown).
 document.addEventListener("htmx:afterSettle", (e) => {
     const path = e.detail?.xhr?.responseURL ?? "";
     const id = path.match(/\/tasks\/(\d+)\/move/)?.[1];
     if (!id) return;
-    document.getElementById(`move-${id}`)?.focus();
+    if (focusCardAfter.delete(id)) document.getElementById(`card-${id}`)?.focus();
+    else document.getElementById(`move-${id}`)?.focus();
 });
 
 let toastEl;

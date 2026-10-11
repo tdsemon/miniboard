@@ -39,10 +39,9 @@ router.delete("/tasks/:id", async (req,res) => {
 
 router.post("/tasks/:id/move", async (req,res) => {
     const { toColumn, toIndex: rawIndex } = req.body ?? {};
-    if (req.body?.forceFail) return res.status(500).send(""); // temporary: ?fail=1 failure injection (test scaffolding, remove in step 8)
-    // drag (dnd.js) and the keyboard select always send toColumn; a body
-    // without one has no caller left (the → button is gone), so treat it as
-    // a bad request instead of inventing a destination.
+    // drag (dnd.js), the keyboard select and alt+arrow all send toColumn; a
+    // body without one has no caller, so treat it as a bad request rather
+    // than inventing a destination.
     if (toColumn === undefined) return res.status(400).send("");
     const index = rawIndex === undefined ? tasksInColumn(toColumn).length : Number(rawIndex);
     if (!Number.isInteger(index)) return res.status(400).send("");
@@ -51,12 +50,17 @@ router.post("/tasks/:id/move", async (req,res) => {
     if (!result.ok) return res.status(result.reason === "not-found" ? 404 : 400).send("");
 
     // contract: primary fragment = the column the card came FROM (clients always
-    // target it), OOB = the column it went TO. One shape serves drag and the
-    // keyboard select alike.
+    // target it), OOB = the column it went TO. One shape serves drag, the
+    // keyboard select and alt+arrow reorder alike.
     let out = await renderColumn(res, result.fromColumn);
     if (result.fromColumn !== result.toColumn) out += await renderColumn(res, result.toColumn, true);
-    const label = columns.find((c) => c.key === result.toColumn).label;
-    out += await renderPartial(res, "partials/announce", { title: result.task.title, label });
+    const within = result.fromColumn === result.toColumn;
+    out += await renderPartial(res, "partials/announce", {
+        title: result.task.title,
+        label: columns.find((c) => c.key === result.toColumn).label,
+        // within-column moves announce the slot, which is what alt+arrow moved
+        ...(within ? { position: result.task.order + 1, total: tasksInColumn(result.toColumn).length } : {}),
+    });
     res.send(out);
 })
 
