@@ -1,26 +1,108 @@
-/* Base Reset & Variables */
+/* ============================================================
+   TOKENS — two layers. Primitives are raw values; components use
+   ONLY the semantic layer. Colours are one source of truth per
+   theme via light-dark(light, dark): which side applies is decided
+   by color-scheme, which the data-theme mechanism below sets.
+   ============================================================ */
 :root {
-    --bg-main: #ffffff;
-    --bg-sidebar: #f9fafb;
-    --border-color: #e5e7eb;
-    --text-main: #111827;
-    --text-muted: #6b7280;
-    --surface-muted: #f3f4f6; /* pills, tabs, hover fills */
-    --on-dark: #fff;          /* text on accent fills and the dark toast */
-    --accent: #4f46e5; /* Indigo */
-    --accent-soft: #eef2ff;
+    /* --- primitives: neutral, light steps --- */
+    --n-0: #ffffff;
+    --n-50: #f9fafb;
+    --n-100: #f3f4f6;
+    --n-200: #e5e7eb;
+    --n-500: #6b7280;
+    --n-900: #111827;
+
+    /* --- primitives: neutral, dark steps (layered, never #000/#fff) --- */
+    --n-d-page: #0f1117;
+    --n-d-chrome: #13161f;
+    --n-d-surface: #161922;
+    --n-d-raised: #212636;
+    --n-d-fill: #1d2130;
+    --n-d-border: #2a2f3d;
+    --n-d-border-strong: #566078;
+    --n-d-text: #e6e8ee;
+    --n-d-muted: #9aa1b2;
+
+    /* --- primitives: accent + status --- */
+    --indigo-50: #eef2ff;
+    --indigo-600: #4f46e5;
+    --indigo-400: #818cf8;
+    --indigo-950: #262a45;
+    --amber-500: #f59e0b;
+    --amber-400: #fbbf24;
+    --green-500: #10b981;
+    --green-400: #34d399;
+    --red-600: #dc2626;
+    --red-400: #f87171;
+
+    /* --- primitives: radii / spacing / type / motion (adopted in
+           components from stage 4 — colours must never use these) --- */
+    --r-sm: 6px;
+    --r-md: 8px;
+    --r-lg: 10px;
+    --r-xl: 14px;
+    --r-full: 999px;
+    --s-1: 4px;
+    --s-2: 8px;
+    --s-3: 12px;
+    --s-4: 16px;
+    --s-5: 24px;
+    --s-6: 32px;
+    --fs-xs: clamp(0.7rem, 0.68rem + 0.1vw, 0.75rem);
+    --fs-sm: clamp(0.8rem, 0.78rem + 0.1vw, 0.875rem);
+    --fs-md: clamp(0.9rem, 0.87rem + 0.15vw, 1rem);
+    --fs-lg: clamp(1rem, 0.96rem + 0.2vw, 1.125rem);
+    --fs-xl: clamp(1.1rem, 1.04rem + 0.3vw, 1.375rem);
+    --dur-1: 120ms;
+    --dur-2: 200ms;
+    --dur-3: 300ms;
+    --ease-out: cubic-bezier(0.2, 0, 0, 1);
+
+    /* --- primitives: layout --- */
     --sidebar-width: 260px;
     --topbar-height: 60px;
-    --ghost-bg: #eef2ff;
-    --ghost-border: #4f46e5;
-    --chosen-shadow: 0 8px 20px rgba(17, 24, 39, 0.15);
-    --toast-bg: #111827;
     --notes-width: 360px;
-    --backdrop-bg: rgba(17, 24, 39, 0.25);
-    --panel-shadow: -8px 0 24px rgba(17, 24, 39, 0.08);
-    --dot-planned: #f59e0b;
+
+    /* --- semantic: colours (the only layer components reference) --- */
+    --bg: light-dark(var(--n-0), var(--n-d-page));
+    --surface: light-dark(var(--n-0), var(--n-d-surface));
+    --surface-raised: light-dark(var(--n-0), var(--n-d-raised));
+    --surface-sunken: light-dark(var(--n-50), var(--n-d-chrome));
+    --surface-muted: light-dark(var(--n-100), var(--n-d-fill));
+    --surface-inverse: light-dark(var(--n-900), var(--n-d-text));
+    --on-inverse: light-dark(var(--n-0), var(--n-d-page));
+    --border: light-dark(var(--n-200), var(--n-d-border));
+    --border-strong: light-dark(var(--n-900), var(--n-d-border-strong));
+    --text: light-dark(var(--n-900), var(--n-d-text));
+    --text-muted: light-dark(var(--n-500), var(--n-d-muted));
+    --accent: light-dark(var(--indigo-600), var(--indigo-400));
+    --accent-soft: light-dark(var(--indigo-50), var(--indigo-950));
+    --on-accent: light-dark(var(--n-0), var(--n-d-page));
+    --danger: light-dark(var(--red-600), var(--red-400));
+    --dot-planned: light-dark(var(--amber-500), var(--amber-400));
     --dot-progress: var(--accent);
-    --dot-done: #10b981;
+    --dot-done: light-dark(var(--green-500), var(--green-400));
+    --backdrop: light-dark(rgba(17, 24, 39, 0.25), rgba(5, 7, 12, 0.55));
+    /* stage 3's pull veil: in each mode it previews the OTHER mode's tone */
+    --veil: light-dark(var(--n-d-surface), var(--n-100));
+    --shadow-1: light-dark(0 1px 3px rgba(17, 24, 39, 0.08), 0 1px 3px rgba(0, 0, 0, 0.45));
+    --shadow-2: light-dark(0 8px 20px rgba(17, 24, 39, 0.15), 0 8px 20px rgba(0, 0, 0, 0.55));
+    --shadow-drawer: light-dark(-8px 0 24px rgba(17, 24, 39, 0.08), -8px 0 24px rgba(0, 0, 0, 0.5));
+}
+
+/* Theme mechanism: no stored choice = follow the OS; a stored choice pins
+   it (data-theme set before first paint by the inline script in index.ejs). */
+:root {
+    color-scheme: light dark;
+}
+
+:root[data-theme="light"] {
+    color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
 }
 
 * {
@@ -31,9 +113,25 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    color: var(--text-main);
-    background-color: var(--bg-main);
+    color: var(--text);
+    background-color: var(--bg);
     line-height: 1.5;
+}
+
+/* themed selection + scrollbars (both colors adapt per theme) */
+::selection {
+    background: var(--accent-soft);
+    color: var(--text);
+}
+
+* {
+    scrollbar-color: var(--text-muted) transparent;
+    scrollbar-width: thin;
+}
+
+/* Alpine hides cloaked elements until its first init (theme icons) */
+[x-cloak] {
+    display: none !important;
 }
 
 /* Layout Structure */
@@ -46,8 +144,8 @@ body {
 /* Sidebar */
 .sidebar {
     width: var(--sidebar-width);
-    background-color: var(--bg-sidebar);
-    border-right: 1px solid var(--border-color);
+    background-color: var(--surface-sunken);
+    border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
@@ -96,7 +194,7 @@ body {
 
 .project-btn:hover {
     background-color: var(--surface-muted);
-    color: var(--text-main);
+    color: var(--text);
 }
 
 .project-btn.active {
@@ -122,7 +220,7 @@ body {
 }
 
 .project-x:hover {
-    color: var(--text-main);
+    color: var(--text);
     background: var(--surface-muted);
 }
 
@@ -150,7 +248,7 @@ body {
 .board-rename button {
     border: 1px solid var(--accent);
     background: var(--accent);
-    color: var(--on-dark);
+    color: var(--on-accent);
     border-radius: 6px;
     padding: 0.35rem 0.5rem;
     font-size: 0.75rem;
@@ -160,7 +258,7 @@ body {
 .board-add input {
     width: 100%;
     padding: 0.4rem 0.75rem;
-    border: 1px dashed var(--border-color);
+    border: 1px dashed var(--border);
     border-radius: 6px;
     background: transparent;
     font-family: inherit;
@@ -176,7 +274,7 @@ body {
     outline: none;
     border-color: var(--accent);
     border-style: solid;
-    color: var(--text-main);
+    color: var(--text);
 }
 
 /* Main Content Area */
@@ -190,7 +288,7 @@ body {
 /* Topbar */
 .topbar {
     height: var(--topbar-height);
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
     padding: 0 1rem;
@@ -201,7 +299,7 @@ body {
     height: 35px;
     width: auto;
     background: none;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 6px;
     padding: 0.4rem 0.6rem;
     cursor: pointer;
@@ -210,7 +308,30 @@ body {
 }
 
 .icon-btn:hover {
-    background-color: var(--bg-sidebar);
+    background-color: var(--surface-sunken);
+}
+
+/* Theme toggle: the accessible primary control, 44px target, always visible.
+   Which icon shows is bound in markup from $store.theme.effective (the store
+   knows system + stored, CSS can't without duplicating the logic). */
+.theme-toggle {
+    height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.theme-toggle svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+}
+
+.theme-toggle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
 }
 
 /* View Tabs */
@@ -235,13 +356,13 @@ body {
 }
 
 .tabs button:hover {
-    color: var(--text-main);
+    color: var(--text);
 }
 
 .tabs button.active {
-    background: white;
-    color: var(--text-main);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    background: var(--surface-raised);
+    color: var(--text);
+    box-shadow: var(--shadow-1);
 }
 
 /* Search */
@@ -249,12 +370,12 @@ body {
     margin-left: auto;
     width: 100%;
     max-width: 260px;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 999px;
-    background: var(--bg-sidebar);
+    background: var(--surface-sunken);
     padding: 0.5rem 1rem;
     font-size: 0.85rem;
-    color: var(--text-main);
+    color: var(--text);
     transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
 }
 
@@ -264,7 +385,7 @@ body {
 
 .search:focus {
     outline: none;
-    background: var(--bg-main);
+    background: var(--bg);
     border-color: var(--accent);
     box-shadow: 0 0 0 3px var(--accent-soft);
 }
@@ -297,8 +418,8 @@ body {
 .column {
     flex: 1;
     min-width: 240px;
-    background: var(--bg-sidebar);
-    border: 1px solid var(--border-color);
+    background: var(--surface-sunken);
+    border: 1px solid var(--border);
     border-radius: 10px;
     padding: 0.75rem;
     display: flex;
@@ -352,15 +473,15 @@ body {
     content: "No tasks";
     font-size: 0.8rem;
     color: var(--text-muted);
-    border: 1px dashed var(--border-color);
+    border: 1px dashed var(--border);
     border-radius: 8px;
     padding: 1rem;
     text-align: center;
 }
 
 .card {
-    background: var(--bg-main);
-    border: 1px solid var(--border-color);
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 0.75rem;
     cursor: grab;
@@ -369,7 +490,7 @@ body {
 
 .card:hover {
     border-color: var(--accent);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+    box-shadow: var(--shadow-1);
 }
 
 .card:active { cursor: grabbing; }
@@ -382,7 +503,7 @@ body {
 .add-btn {
     width: 100%;
     background: transparent;
-    border: 1px dashed var(--border-color);
+    border: 1px dashed var(--border);
     border-radius: 8px;
     padding: 0.6rem;
     font-size: 0.8rem;
@@ -406,12 +527,12 @@ body {
 
 .add-form input {
     width: 100%;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 0.6rem;
     font-size: 0.85rem;
-    background: var(--bg-main);
-    color: var(--text-main);
+    background: var(--surface);
+    color: var(--text);
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
@@ -432,7 +553,7 @@ body {
     padding: 0.6rem;
     font-size: 0.85rem;
     font-weight: 500;
-    color: var(--on-dark);
+    color: var(--on-accent);
     cursor: pointer;
     transition: filter 0.2s;
 }
@@ -465,9 +586,9 @@ body {
 }
 
 .move-select {
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 6px;
-    background: var(--bg-main);
+    background: var(--surface);
     color: var(--text-muted);
     font-size: 0.75rem;
     padding: 0.15rem 0.3rem;
@@ -477,7 +598,7 @@ body {
 
 .move-select:hover {
     border-color: var(--accent);
-    color: var(--text-main);
+    color: var(--text);
 }
 
 /* undo sr-only when the card (or the select) has focus — stays tabbable
@@ -525,7 +646,7 @@ body {
 .notes-btn {
     margin-left: auto;
     background: none;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 6px;
     padding: 0.15rem 0.45rem;
     font-size: 0.7rem;
@@ -541,7 +662,7 @@ body {
 .notes-backdrop {
     position: fixed;
     inset: 0;
-    background: var(--backdrop-bg);
+    background: var(--backdrop);
     z-index: 40;
 }
 
@@ -551,9 +672,9 @@ body {
     right: 0;
     bottom: 0;
     width: min(var(--notes-width), 92vw);
-    background: var(--bg-main);
-    border-left: 1px solid var(--border-color);
-    box-shadow: var(--panel-shadow);
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    box-shadow: var(--shadow-drawer);
     z-index: 50;
     display: flex;
     flex-direction: column;
@@ -584,7 +705,7 @@ body {
 
 .notes-close {
     background: none;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 6px;
     padding: 0.15rem 0.5rem;
     cursor: pointer;
@@ -603,7 +724,7 @@ body {
     flex: 1;
     min-height: 10rem;
     resize: vertical;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 0.6rem;
     font: inherit;
@@ -626,7 +747,7 @@ body {
     background: var(--accent);
     border: none;
     border-radius: 8px;
-    color: var(--on-dark);
+    color: var(--on-accent);
     padding: 0.5rem 1rem;
     font-size: 0.85rem;
     cursor: pointer;
@@ -680,20 +801,20 @@ body {
 .draft-restore {
     background: var(--accent);
     border: 1px solid var(--accent);
-    color: var(--on-dark);
+    color: var(--on-accent);
 }
 
 .draft-discard {
-    background: var(--bg-main);
-    border: 1px solid var(--border-color);
+    background: var(--surface);
+    border: 1px solid var(--border);
     color: var(--text-muted);
 }
 
 /* rule 6: conflict bar — same slot as the restore prompt, both conflict
    sources, keep mine focused by default */
 .conflict-bar {
-    border-color: var(--text-main);
-    background: var(--bg-sidebar);
+    border-color: var(--border-strong);
+    background: var(--surface-sunken);
 }
 
 .conflict-keep,
@@ -708,13 +829,13 @@ body {
 .conflict-keep {
     background: var(--accent);
     border: 1px solid var(--accent);
-    color: var(--on-dark);
+    color: var(--on-accent);
 }
 
 .conflict-take,
 .conflict-show {
-    background: var(--bg-main);
-    border: 1px solid var(--border-color);
+    background: var(--surface);
+    border: 1px solid var(--border);
     color: var(--text-muted);
 }
 
@@ -730,8 +851,8 @@ body {
     overflow: auto;
     margin: 0;
     padding: 0.35rem 0.5rem;
-    background: var(--bg-main);
-    border: 1px dashed var(--border-color);
+    background: var(--surface);
+    border: 1px dashed var(--border);
     border-radius: 6px;
     font: 0.75rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
     white-space: pre-wrap;
@@ -769,7 +890,7 @@ body {
     background: var(--accent);
     border: none;
     border-radius: 6px;
-    color: var(--on-dark);
+    color: var(--on-accent);
     padding: 0.3rem 0.75rem;
     font-size: 0.75rem;
     cursor: pointer;
@@ -777,7 +898,7 @@ body {
 
 .continue-x {
     background: none;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 6px;
     color: var(--text-muted);
     padding: 0.15rem 0.5rem;
@@ -796,8 +917,8 @@ body {
 /* Drag & drop (SortableJS classes set in public/dnd.js) */
 .card-ghost {
     opacity: 0.5;
-    background: var(--ghost-bg);
-    border: 1px dashed var(--ghost-border);
+    background: var(--accent-soft);
+    border: 1px dashed var(--accent);
 }
 
 .card-chosen {
@@ -805,7 +926,7 @@ body {
 }
 
 .card-drag {
-    box-shadow: var(--chosen-shadow);
+    box-shadow: var(--shadow-2);
     cursor: grabbing;
 }
 
@@ -814,8 +935,8 @@ body {
     position: fixed;
     bottom: 1.25rem;
     right: 1.25rem;
-    background: var(--toast-bg);
-    color: var(--on-dark);
+    background: var(--surface-inverse);
+    color: var(--on-inverse);
     padding: 0.6rem 1rem;
     border-radius: 8px;
     font-size: 0.85rem;
@@ -843,7 +964,7 @@ body {
 .task-table th {
     text-align: left;
     padding: 0.4rem 0.75rem;
-    border-bottom: 2px solid var(--border-color);
+    border-bottom: 2px solid var(--border);
     color: var(--text-muted);
     font-weight: 600;
     font-size: 0.75rem;
@@ -869,7 +990,7 @@ body {
 
 .task-table td {
     padding: 0.55rem 0.75rem;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
     vertical-align: middle;
 }
 
@@ -942,8 +1063,8 @@ body {
     gap: 0.75rem;
     padding: 0.5rem 0.75rem;
     margin-bottom: 0.35rem;
-    background: var(--bg-main);
-    border: 1px solid var(--border-color);
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 8px;
     transition: border-color 0.2s;
 }
@@ -963,4 +1084,25 @@ body {
 
 .list-row .notes-btn {
     margin-left: 0;
+}
+
+/* ============================================================
+   THEME SWITCHING (public/theme.js)
+   ============================================================ */
+
+/* Circular reveal: theme.js animates ::view-transition-new(root) itself, so
+   the default root cross-fade must not also run (old snapshot stays put
+   under the growing circle). */
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+}
+
+/* Fallback when the browser has no view transitions: one shared 250ms
+   colour fade. Class is added, flushed, then data-theme flips, then the
+   class is dropped. Never used under prefers-reduced-motion: reduce. */
+.theme-fade,
+.theme-fade * {
+    transition: background-color 250ms ease, color 250ms ease, border-color 250ms ease;
 }

@@ -4,6 +4,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#ffffff">
+    <!-- no-flash: apply a stored theme before the stylesheet and first paint.
+         No stored value = follow the OS (color-scheme + light-dark() decide);
+         an invalid stored value is ignored and cleared. -->
+    <script>
+        (function () {
+            try {
+                var stored = localStorage.getItem("miniboard:theme");
+                if (stored === "light" || stored === "dark") {
+                    document.documentElement.dataset.theme = stored;
+                    document.querySelector('meta[name="theme-color"]').content =
+                        stored === "dark" ? "#0f1117" : "#ffffff";
+                } else {
+                    if (stored !== null) localStorage.removeItem("miniboard:theme");
+                    document.querySelector('meta[name="theme-color"]').content =
+                        matchMedia("(prefers-color-scheme: dark)").matches ? "#0f1117" : "#ffffff";
+                }
+            } catch (e) { /* storage blocked: system theme, nothing to flash */ }
+        })();
+    </script>
     <title>Miniboard</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="stylesheet" href="/style.css">
@@ -12,11 +33,12 @@
     <script src="/vendor/htmx.min.js"></script>
     <script src="/vendor/Sortable.min.js"></script>
     <script src="/dnd.js"></script>
-    <!-- notes.js listens on alpine:initializing, which Alpine fires after the
-         persist plugin's alpine:init handler, so tag order here is not
+    <!-- notes.js and theme.js listen on alpine:initializing, which Alpine fires
+         after the persist plugin's alpine:init handler, so tag order here is not
          load-bearing — but keep these as defer/module scripts so they run
          before Alpine's start(). -->
     <script defer src="/vendor/alpine-persist.min.js"></script>
+    <script defer src="/theme.js"></script>
     <script type="module" src="/notes.js"></script>
     <script defer src="/vendor/alpine.min.js"></script>
 
@@ -51,6 +73,23 @@
 
             <input class="search" type="search" name="q" placeholder="Search task..."
                 @input.debounce.300ms="$store.mb.refresh()">
+
+            <!-- primary theme control: 44px, aria-pressed reflects effective
+                 theme, click animates via startViewTransition in theme.js -->
+            <button type="button" class="icon-btn theme-toggle" id="theme-toggle"
+                @click="$store.theme.toggle($el)"
+                :aria-pressed="$store.theme.effective === 'dark' ? 'true' : 'false'"
+                :aria-label="$store.theme.effective === 'dark' ? 'switch to light theme' : 'switch to dark theme'">
+                <svg x-show="$store.theme.effective !== 'dark'" x-cloak viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="4"></circle>
+                    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+                </svg>
+                <svg x-show="$store.theme.effective === 'dark'" x-cloak viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+            </button>
 
         </header>
 
