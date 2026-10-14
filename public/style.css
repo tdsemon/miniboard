@@ -143,9 +143,16 @@ body {
     overflow: hidden;
 }
 
-/* Sidebar — below 1024 an off-canvas drawer (fixed, so it leaves no gap in
-   the flex row; inert/aria-hidden come from markup), at >=1024 a permanent
-   column that the menu button collapses via display:none. */
+/* Sidebar layout modes (one source of truth in index.ejs: applyLayout):
+   "drawer" below 1024 — an off-canvas overlay, always closed on load and on
+   every crossing into drawer mode; "docked" at >=1024 — a permanent column
+   the menu button collapses (persisted as $store.mb.ui.sidebarDocked).
+   inert/aria-hidden come from markup; the drawer also locks page scroll. */
+html.nav-locked,
+html.nav-locked body {
+    overflow: hidden;
+}
+
 .sidebar {
     width: var(--sidebar-width);
     background-color: var(--surface-sunken);
@@ -154,12 +161,18 @@ body {
     flex-direction: column;
     flex-shrink: 0;
     overflow-y: auto;
-    transform: translateX(-100%);
-    transition: transform 200ms ease;
 }
 
-.sidebar[data-open="true"] {
-    transform: none;
+.sidebar-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.sidebar-close {
+    margin-right: 0.75rem;
 }
 
 @media (max-width: 1023px) {
@@ -169,6 +182,12 @@ body {
         bottom: 0;
         left: 0;
         z-index: 60;
+        transform: translateX(-100%);
+        transition: transform 200ms ease;
+    }
+
+    .sidebar[data-open="true"] {
+        transform: none;
     }
 }
 
@@ -178,6 +197,10 @@ body {
     }
 
     .sidebar[data-open="false"] {
+        display: none;
+    }
+
+    .sidebar-close {
         display: none;
     }
 }

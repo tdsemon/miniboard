@@ -177,6 +177,9 @@ document.addEventListener("alpine:initializing", () => {
             view: "board", // board | table | list
             sort: "order", // table view: title | status | note | order
             dir: "asc",
+            // docked-mode sidebar only (>=1024): collapsed vs open. The drawer
+            // below 1024 is never persisted — see index.ejs applyLayout().
+            sidebarDocked: true,
         })
             .as(KEY_UI)
             .using(safeStorage),

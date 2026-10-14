@@ -17,9 +17,15 @@ const SIZES = [
     { w: 320, h: 700 },
     { w: 360, h: 740 },
     { w: 768, h: 1024 },
+    { w: 1023, h: 740 },
+    { w: 1024, h: 740 },
+    { w: 1025, h: 740 },
     { w: 1440, h: 900 },
     { w: 1920, h: 1080 },
 ];
+// sidebar layout-mode crossings: 1023 drawer, 1024/1025 docked.
+// each gets a plain "board" shot and a "drawer" shot (sidebar open).
+const SIDEBAR_SIZES = [1023, 1024, 1025];
 const THEMES = ["light", "dark"];
 
 // deterministic fixture: boards + tasks, two with notes (drawer screenshots)
@@ -55,7 +61,11 @@ server.stderr.on("data", (d) => process.stderr.write(d));
 async function waitForServer() {
     for (let i = 0; i < 50; i++) {
         try {
-            const res = await fetch(`http://localhost:${PORT}/`);
+            // bare fetch() hangs on a keep-alive socket; give each probe its own AbortController
+            const ac = new AbortController();
+            const t = setTimeout(() => ac.abort(), 500);
+            const res = await fetch(`http://localhost:${PORT}/`, { signal: ac.signal });
+            clearTimeout(t);
             if (res.ok) return;
         } catch { /* not up yet */ }
         await new Promise((r) => setTimeout(r, 100));
@@ -119,6 +129,40 @@ try {
         }
     }
 
+    // sidebar layout-mode crossings (both themes) — drawer open + board, no overflow
+    for (const theme of THEMES) {
+        for (const w of SIDEBAR_SIZES) {
+            const context = await browser.newContext({ viewport: { width: w, height: 740 } });
+            await context.addInitScript((t) => localStorage.setItem("miniboard:theme", t), theme);
+            const page = await context.newPage();
+            await page.goto(`http://localhost:${PORT}/`, { waitUntil: "networkidle" });
+            await page.waitForSelector(".column", { timeout: 5000 });
+            await page.waitForTimeout(400);
+
+            const checkOverflow = async (label) => {
+                const { sw, cw } = await page.evaluate(() => ({
+                    sw: document.documentElement.scrollWidth,
+                    cw: document.documentElement.clientWidth,
+                }));
+                if (sw > cw) overflow.push(`${label}: scrollWidth ${sw} > clientWidth ${cw}`);
+            };
+
+            const shot = (state) => page.screenshot({ path: path.join(root, "screenshots", `${theme}-${w}x740-${state}.png`) });
+
+            // board (sidebar closed)
+            await checkOverflow(`${theme} ${w}x740 board`);
+            await shot("board");
+
+            // sidebar drawer open
+            await page.locator(".menu-btn").click();
+            await page.waitForTimeout(400);
+            await checkOverflow(`${theme} ${w}x740 drawer`);
+            await shot("drawer");
+
+            await context.close();
+        }
+    }
+
     await browser.close();
 } finally {
     server.kill("SIGTERM");
@@ -136,4 +180,4 @@ if (failures.length) {
     for (const line of failures) console.error("  " + line);
     process.exit(1);
 }
-console.log(`ok: ${THEMES.length * SIZES.length * 4} screenshots, no horizontal overflow`);
+console.log(`ok: ${THEMES.length * SIZES.length * 4} screenshots (plus ${THEMES.length * SIDEBAR_SIZES.length * 2} sidebar), no horizontal overflow`);

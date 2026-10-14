@@ -46,14 +46,41 @@
 <body>
 
 
-   <!-- One Alpine object owns the shell: sidebar, the current view/board, and
-        the rename-in-progress id. Every board/view re-render goes through
-        $store.mb.refresh() (notes.js) so the URL always reflects the store;
-        htmx owns the request and the swap. Below 1024 the sidebar is an
-        off-canvas drawer (closed by default); at >=1024 it is a permanent
-        column the menu button collapses. -->
+   <!-- One Alpine object owns the shell: sidebar layout mode, the current
+        view/board, and the rename-in-progress id. Every board/view re-render
+        goes through $store.mb.refresh() (notes.js) so the URL always reflects
+        the store; htmx owns the request and the swap.
+        Layout has two modes driven by one source of truth (a matchMedia
+        listener, no reload): "docked" at >=1024 (a permanent column the menu
+        button collapses; the collapsed state is persisted as
+        $store.mb.ui.sidebarDocked) and "drawer" below (an off-canvas overlay,
+        always closed on load and on every crossing into drawer mode, never
+        persisted). -->
    <div class="app" x-data="{
-        sidebarOpen: window.matchMedia('(min-width: 1024px)').matches,
+        layout: &quot;docked&quot;,
+        drawerOpen: false,
+        _mq: null,
+        get sidebarDocked() { return this.$store.mb.ui.sidebarDocked; },
+        set sidebarDocked(v) { this.$store.mb.ui.sidebarDocked = v; },
+        get sidebarOpen() { return this.layout === &quot;docked&quot; ? this.sidebarDocked : this.drawerOpen; },
+        set sidebarOpen(v) {
+            if (this.layout === &quot;docked&quot;) this.sidebarDocked = v;
+            else this.drawerOpen = v;
+        },
+        applyLayout(mode) {
+            if (this.layout === mode) return;
+            const wasDrawer = this.layout === &quot;drawer&quot;;
+            this.layout = mode;
+            if (mode === &quot;drawer&quot;) {
+                // drawer is never persisted: always closed when we cross in
+                this.drawerOpen = false;
+                document.documentElement.classList.remove(&quot;nav-locked&quot;);
+            } else if (wasDrawer) {
+                // drop the drawer state; docked reads the persisted flag
+                this.drawerOpen = false;
+                document.documentElement.classList.remove(&quot;nav-locked&quot;);
+            }
+        },
         editingId: null,
         fadedFor: null,
         setView(v) { const ui = this.$store.mb.ui; if (ui.view !== v) { ui.view = v; this.$store.mb.refresh(); } },
@@ -62,12 +89,29 @@
             if (ui.activeBoardId !== id) {
                 ui.activeBoardId = id;
                 this.$store.mb.refresh();
-                if (window.innerWidth < 1024) this.sidebarOpen = false; // switch closes the drawer
+                if (this.layout === &quot;drawer&quot;) this.closeSidebar(); // switch closes the drawer
+            }
+        },
+        toggleSidebar() {
+            this.sidebarOpen = !this.sidebarOpen;
+            // drawer only: lock page scroll and move focus into the drawer.
+            // (docked mode has no backdrop and no scroll lock.)
+            if (this.layout === &quot;drawer&quot;) {
+                document.documentElement.classList.toggle(&quot;nav-locked&quot;, this.drawerOpen);
+                if (this.drawerOpen) {
+                    // wait out the slide: $nextTick still leaves the drawer
+                    // mid-transition (off-screen), and the browser won't focus
+                    // an element whose rect is off-screen.
+                    this.$nextTick(() =&gt; setTimeout(() =&gt; this.$el.querySelector(&quot;.sidebar-close&quot;)?.focus(), 200));
+                }
             }
         },
         closeSidebar() {
+            if (this.layout === &quot;drawer&quot; &amp;&amp; !this.drawerOpen) return;
             this.sidebarOpen = false;
-            this.$nextTick(() => this.$el.querySelector('.menu-btn')?.focus());
+            // backdrop/close-button/Escape all land here: unlock + refocus menu
+            document.documentElement.classList.remove(&quot;nav-locked&quot;);
+            this.$nextTick(() =&gt; setTimeout(() =&gt; this.$el.querySelector(&quot;.menu-btn&quot;)?.focus(), 200));
         },
         // --- board rename: one code path for the pencil click and the name dblclick.
         // editingId lives here on .app (NOT inside #boards), so an htmx swap of the
@@ -115,35 +159,53 @@
             htmx.ajax('POST', `/boards/${id}`, { values: { name }, target: '#boards', swap: 'outerHTML' });
         },
         init() {
+            // one source of truth for the layout mode: a live matchMedia
+            // listener, no reload. Seeded here so SSR markup and the store
+            // agree before Alpine finishes wiring.
+            this._mq = window.matchMedia(&quot;(min-width: 1024px)&quot;);
+            this._mqSync = () => this.applyLayout(this._mq.matches ? &quot;docked&quot; : &quot;drawer&quot;);
+            this._mqSync();
+            this._mq.addEventListener(&quot;change&quot;, this._mqSync);
+            // drawer is never persisted: always closed on a fresh load
+            this.drawerOpen = false;
+            document.documentElement.classList.remove(&quot;nav-locked&quot;);
             this.$store.mb.refresh();
             // fade the view root on first paint and view switches only — card
             // moves and search swaps keep the same view name, so they never
             // replay the animation (class add forces a restart when it does)
-            window.addEventListener('htmx:afterSettle', () => {
+            window.addEventListener(&quot;htmx:afterSettle&quot;, () => {
                 const view = this.$store.mb.ui.view;
                 if (view === this.fadedFor) return;
                 this.fadedFor = view;
-                const board = document.getElementById('board');
-                board.classList.remove('view-enter');
+                const board = document.getElementById(&quot;board&quot;);
+                board.classList.remove(&quot;view-enter&quot;);
                 void board.offsetWidth;
-                board.classList.add('view-enter');
+                board.classList.add(&quot;view-enter&quot;);
             });
         },
-    }" @keydown.escape.window="if (sidebarOpen && window.innerWidth < 1024) closeSidebar()">
-    <!-- inert/aria-hidden when closed: off-canvas transform alone would keep
-         it focusable; display:none takes over at >=1024 via CSS -->
+        destroy() { this._mq?.removeEventListener(&quot;change&quot;, this._mqSync); },
+    }" @keydown.escape.window="if (drawerOpen) closeSidebar()"
+        :class="drawerOpen ? 'drawer-open' : ''">
+    <!-- inert/aria-hidden when the drawer is closed (off-canvas transform
+         alone would keep it focusable). Docked mode never sets inert — the
+         sidebar is a permanent column there, open or collapsed. -->
     <aside class="sidebar" :data-open="sidebarOpen ? 'true' : 'false'"
-        :inert="!sidebarOpen" :aria-hidden="!sidebarOpen" aria-label="Boards">
-        <div class="brand">Miniboard</div>
+        :inert="layout === 'drawer' && !drawerOpen" :aria-hidden="layout === 'drawer' && !drawerOpen" aria-label="Boards">
+        <div class="sidebar-head">
+            <div class="brand">Miniboard</div>
+            <!-- drawer-only close control; CSS hides it in docked mode -->
+            <button type="button" class="icon-btn sidebar-close" @click="closeSidebar()"
+                aria-label="close sidebar" x-show="layout === 'drawer'" x-cloak>✕</button>
+        </div>
         <!-- filled by GET /boards on load; every add/rename/delete re-swaps it -->
         <nav id="boards" class="projects" hx-get="/boards" hx-trigger="load" hx-swap="outerHTML"></nav>
     </aside>
     <div class="sidebar-backdrop" aria-hidden="true"
-        :data-open="sidebarOpen ? 'true' : 'false'" @click="sidebarOpen = false"></div>
+        :data-open="sidebarOpen ? 'true' : 'false'" @click="closeSidebar()"></div>
 
     <main class="main">
         <header class="topbar">
-            <button type="button" class="icon-btn menu-btn" @click="sidebarOpen = !sidebarOpen"
+            <button type="button" class="icon-btn menu-btn" @click="toggleSidebar()"
                 aria-label="Toggle boards sidebar" :aria-expanded="sidebarOpen ? 'true' : 'false'">☰</button>
             <span class="topbar-title" x-data="{
                     name: '',
