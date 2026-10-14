@@ -69,6 +69,51 @@
             this.sidebarOpen = false;
             this.$nextTick(() => this.$el.querySelector('.menu-btn')?.focus());
         },
+        // --- board rename: one code path for the pencil click and the name dblclick.
+        // editingId lives here on .app (NOT inside #boards), so an htmx swap of the
+        // sidebar can't wipe it and Alpine re-renders the rename form after a swap.
+        renameError: null,
+        renameDraft: null,   // typed-but-unsaved value, kept across a #boards swap
+        _renameOutside: null,
+        startRename(id) {
+            if (this._renameOutside) { document.removeEventListener('pointerdown', this._renameOutside); this._renameOutside = null; }
+            this.editingId = id;
+            this.renameError = null;
+            this.renameDraft = null;
+            // close on the NEXT outside pointerdown — attached after this opening
+            // click's own pointerdown has already fired, so it can't self-close
+            this._renameOutside = (e) => {
+                if (this.editingId == null) return;
+                if (e.target.closest('.board-rename') || e.target.closest('[data-rename-btn]')) return;
+                this.cancelRename(false);
+            };
+            this.$nextTick(() => document.addEventListener('pointerdown', this._renameOutside));
+        },
+        cancelRename(refocus) {
+            const id = this.editingId;
+            this.editingId = null;
+            this.renameError = null;
+            this.renameDraft = null;
+            if (this._renameOutside) { document.removeEventListener('pointerdown', this._renameOutside); this._renameOutside = null; }
+            if (refocus && id != null) this.$nextTick(() => document.querySelector('[data-rename-btn=&quot;' + id + '&quot;]')?.focus());
+        },
+        submitRename(id) {
+            const input = document.querySelector('.board-rename input');
+            const name = (input?.value ?? '').trim();
+            if (!name) { this.renameError = &quot;Board name can&apos;t be empty&quot;; input?.focus(); return; }
+            if (name.length > 40) { this.renameError = &quot;Board name is too long (max 40 characters)&quot;; input?.focus(); return; }
+            this.renameError = null;
+            // close only on a real 2xx; a 400/404 keeps the form open with a message
+            const onDone = (evt) => {
+                if (evt.detail?.pathInfo?.requestPath !== `/boards/${id}`) return;
+                document.removeEventListener('htmx:afterRequest', onDone);
+                const status = evt.detail?.xhr?.status ?? 0;
+                if (status >= 200 && status < 300) this.cancelRename(true);
+                else this.renameError = &quot;Couldn&apos;t rename the board. Try again.&quot;;
+            };
+            document.addEventListener('htmx:afterRequest', onDone);
+            htmx.ajax('POST', `/boards/${id}`, { values: { name }, target: '#boards', swap: 'outerHTML' });
+        },
         init() {
             this.$store.mb.refresh();
             // fade the view root on first paint and view switches only — card

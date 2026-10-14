@@ -9,22 +9,24 @@
                 x-show="editingId !== <%= b.id %>"
                 :class="$store.mb.ui.activeBoardId === <%= b.id %> && 'active'"
                 @click="pickBoard(<%= b.id %>)"
-                @dblclick="editingId = <%= b.id %>"><%= b.name %></button>
+                @dblclick="startRename(<%= b.id %>)"><%= b.name %></button>
             <template x-if="editingId === <%= b.id %>">
-                <form class="board-rename" hx-post="/boards/<%= b.id %>" hx-target="#boards" hx-swap="outerHTML"
-                    @submit="editingId = null" @click.outside="editingId = null">
-                    <input name="name" value="<%= b.name %>" required maxlength="60"
-                        x-init="$nextTick(() => { $el.focus(); $el.select(); })"
-                        @keydown.escape.stop="editingId = null">
+                <form class="board-rename" @submit.prevent="submitRename(<%= b.id %>)">
+                    <input name="name" value="<%= b.name %>" aria-label="board name" maxlength="40"
+                        x-init="$nextTick(() => { if (renameDraft != null) $el.value = renameDraft; $el.focus(); $el.select(); })"
+                        @input="renameDraft = $event.target.value"
+                        @keydown.enter.prevent="submitRename(<%= b.id %>)"
+                        @keydown.escape.stop.prevent="cancelRename(true)">
                     <button type="submit">Save</button>
+                    <p class="rename-error" x-show="renameError" x-cloak x-text="renameError" role="alert"></p>
                 </form>
             </template>
             <% if (boards.length > 1) { %>
-                <!-- pencil: the discoverable rename route for touch + keyboard
-                     (dblclick stays as a desktop shortcut; opacity reveal, but
-                     it stays in the tab order — see .project-edit) -->
-                <button type="button" class="project-edit" title="Rename board" aria-label="Rename board <%= b.name %>"
-                    @click="editingId = <%= b.id %>">
+                <!-- pencil: same startRename() code path as the name dblclick; opacity
+                     reveal but stays tabbable; coarse pointers get it permanently -->
+                <button type="button" class="project-edit" data-rename-btn="<%= b.id %>"
+                    title="Rename board" aria-label="rename <%= b.name %>"
+                    @click="startRename(<%= b.id %>)">
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M12 20h9"></path>
                         <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>

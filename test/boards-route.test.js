@@ -2,7 +2,7 @@ import "./helpers.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import app from "../src/app.js";
-import { findTask } from "../src/data/tasks.js";
+import { findTask, findBoard } from "../src/data/tasks.js";
 
 const form = (body) => ({
     method: "POST",
@@ -123,6 +123,38 @@ test("board + view routes", async (t) => {
     await t.test("an empty board name is a 400", async () => {
         assert.equal((await fetch(`${base}/boards`, form("name=+"))).status, 400);
         assert.equal((await fetch(`${base}/boards/1`, form("name=%20"))).status, 400);
+    });
+
+    await t.test("rename trims whitespace and stores the trimmed name", async () => {
+        const r = await fetch(`${base}/boards/1`, form("name=%20%20Trimmed%20%20"));
+        assert.equal(r.status, 200);
+        assert.ok((await r.text()).includes("Trimmed"));
+        assert.equal(findBoard(1).name, "Trimmed");
+        // restore for later tests in this file
+        await fetch(`${base}/boards/1`, form("name=Designs"));
+    });
+
+    await t.test("rename caps a too-long name at 40 characters", async () => {
+        const long = "x".repeat(60);
+        const r = await fetch(`${base}/boards/1`, form(`name=${long}`));
+        assert.equal(r.status, 200);
+        assert.equal(findBoard(1).name.length, 40);
+        await fetch(`${base}/boards/1`, form("name=Designs"));
+    });
+
+    await t.test("rename escapes HTML in the rendered nav", async () => {
+        const r = await fetch(`${base}/boards/1`, form("name=%3Cb%3Ex%3C%2Fb%3E"));
+        assert.equal(r.status, 200);
+        const html = await r.text();
+        // the raw tag must not appear as markup; it is escaped text
+        assert.ok(!/<b>x<\/b>/.test(html));
+        assert.ok(html.includes("&lt;b&gt;x&lt;/b&gt;") || html.includes("&#60;b&#62;"));
+        assert.equal(findBoard(1).name, "<b>x</b>");
+        await fetch(`${base}/boards/1`, form("name=Designs"));
+    });
+
+    await t.test("rename an unknown board is a 404", async () => {
+        assert.equal((await fetch(`${base}/boards/999`, form("name=Ghost"))).status, 404);
     });
 
     await t.test("the last board cannot be deleted", async () => {

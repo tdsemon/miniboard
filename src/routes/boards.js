@@ -8,7 +8,7 @@ const renderPartial = (res, name, data) =>
         res.render(name, data, (err, html) => (err ? reject(err) : resolve(html)));
     });
 
-const NAME_MAX = 60;
+const NAME_MAX = 40;
 const cleanName = (raw) => String(raw ?? "").trim().slice(0, NAME_MAX);
 
 const viewName = (view) => (view === "table" || view === "list" ? view : "board");

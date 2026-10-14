@@ -296,6 +296,8 @@ body {
 
 .board-rename {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     gap: 0.25rem;
     flex: 1;
     padding-left: 0.75rem;
@@ -323,6 +325,16 @@ body {
     padding: 0.35rem 0.5rem;
     font-size: 0.75rem;
     cursor: pointer;
+}
+
+/* validation message under the rename input (role=alert, announced) */
+.rename-error {
+    flex-basis: 100%;
+    margin: 0;
+    padding-left: 0.1rem;
+    color: var(--danger);
+    font-size: 0.72rem;
+    line-height: 1.3;
 }
 
 .board-add input {
