@@ -22,6 +22,13 @@ document.addEventListener("alpine:init", () => {
             dragClass: "card-drag",
             filter: "button, .card-action, select", // Note / X / move-select don't start a drag
             preventOnFilter: false,                // but their clicks still work
+            // touch only: a quick swipe scrolls the lane, a press-hold drags
+            delay: 150,
+            delayOnTouchOnly: true,
+            touchStartThreshold: 5,
+            // horizontal lane autoscroll while dragging
+            scrollSensitivity: 40,
+            scrollSpeed: 12,
             onEnd(evt) {
                 if (evt.from === evt.to && evt.oldIndex === evt.newIndex) return;
                 queueMove(evt);

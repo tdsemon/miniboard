@@ -22,8 +22,8 @@
             <% tasks.forEach((task) => { %>
                 <tr id="row-<%= task.id %>" data-task-id="<%= task.id %>" data-board-id="<%= task.boardId %>">
                     <td class="title-cell"><span class="card-title task-title"><%= task.title %></span></td>
-                    <td><%- include("move-select", {task, columns, target: "#board", swap: "innerHTML", view, sort, dir}) %></td>
-                    <td class="note-cell">
+                    <td data-label="Status"><%- include("move-select", {task, columns, target: "#board", swap: "innerHTML", view, sort, dir}) %></td>
+                    <td class="note-cell" data-label="Note">
                         <% if (task.note) { %>
                             <span class="has-note">yes</span>
                             <% if (task.updatedAt) { %><span class="note-when"><%= String(task.updatedAt).slice(0, 16).replace("T", " ") %></span><% } %>
@@ -31,7 +31,7 @@
                             <span class="no-note">—</span>
                         <% } %>
                     </td>
-                    <td class="order-cell"><%= task.order %></td>
+                    <td class="order-cell" data-label="Order"><%= task.order %></td>
                     <td class="row-actions">
                         <button class="notes-btn" id="notes-btn-<%= task.id %>"
                             @click="$dispatch('notes-open', { id: <%= task.id %> })">Note</button>

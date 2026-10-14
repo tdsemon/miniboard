@@ -134,14 +134,18 @@ body {
     display: none !important;
 }
 
-/* Layout Structure */
+/* Layout Structure
+   Breakpoints (min-width): base <640, 640, 1024, 1600 (columns cap). */
 .app {
     display: flex;
     height: 100vh;
+    height: 100dvh; /* mobile URL bar: dvh tracks the visible viewport */
     overflow: hidden;
 }
 
-/* Sidebar */
+/* Sidebar — below 1024 an off-canvas drawer (fixed, so it leaves no gap in
+   the flex row; inert/aria-hidden come from markup), at >=1024 a permanent
+   column that the menu button collapses via display:none. */
 .sidebar {
     width: var(--sidebar-width);
     background-color: var(--surface-sunken);
@@ -149,6 +153,48 @@ body {
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
+    overflow-y: auto;
+    transform: translateX(-100%);
+    transition: transform 200ms ease;
+}
+
+.sidebar[data-open="true"] {
+    transform: none;
+}
+
+@media (max-width: 1023px) {
+    .sidebar {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 60;
+    }
+}
+
+@media (min-width: 1024px) {
+    .sidebar {
+        transform: none;
+    }
+
+    .sidebar[data-open="false"] {
+        display: none;
+    }
+}
+
+/* drawer backdrop: small screens only (>=1024 must not click-block the board) */
+.sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: var(--backdrop);
+    z-index: 55;
+    display: none;
+}
+
+@media (max-width: 1023px) {
+    .sidebar-backdrop[data-open="true"] {
+        display: block;
+    }
 }
 
 .brand {
@@ -179,6 +225,7 @@ body {
 
 .project-btn {
     flex: 1;
+    min-width: 0;
     padding: 0.5rem 0.75rem;
     border-radius: 6px;
     border: none;
@@ -190,6 +237,9 @@ body {
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .project-btn:hover {
@@ -202,7 +252,11 @@ body {
     color: var(--accent);
 }
 
-.project-x {
+/* delete X + rename pencil: opacity reveal (NOT visibility:hidden, which
+   would drop them from the tab order — keyboard reaches them, :focus-within
+   on the row reveals; coarse pointers get them permanently below) */
+.project-x,
+.project-edit {
     border: none;
     background: transparent;
     color: var(--text-muted);
@@ -211,17 +265,33 @@ body {
     padding: 0.25rem 0.4rem;
     border-radius: 6px;
     cursor: pointer;
-    visibility: hidden;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
 }
 
 .project-item:hover .project-x,
-.project-x:focus-visible {
-    visibility: visible;
+.project-item:hover .project-edit,
+.project-item:focus-within .project-x,
+.project-item:focus-within .project-edit,
+.project-x:focus-visible,
+.project-edit:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
 }
 
-.project-x:hover {
+.project-x:hover,
+.project-edit:hover {
     color: var(--text);
     background: var(--surface-muted);
+}
+
+.project-x:focus-visible,
+.project-edit:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
 }
 
 .board-rename {
@@ -285,14 +355,40 @@ body {
     min-width: 0; /* Prevents flex items from overflowing */
 }
 
-/* Topbar */
+/* Topbar — below 640 it wraps: row 1 = menu, board name, search icon,
+   theme toggle; row 2 = full-width segmented tabs. At >=640 one row. */
 .topbar {
-    height: var(--topbar-height);
+    min-height: var(--topbar-height);
+    height: auto;
     border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
     padding: 0 1rem;
-    gap: 1rem;
+    padding-top: env(safe-area-inset-top);
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+@media (min-width: 640px) {
+    .topbar {
+        flex-wrap: nowrap;
+    }
+}
+
+.topbar-title {
+    flex: 1;
+    min-width: 0;
+    font-weight: 600;
+    font-size: 0.95rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (min-width: 640px) {
+    .topbar-title {
+        flex: 0 1 auto;
+    }
 }
 
 .icon-btn {
@@ -343,6 +439,20 @@ body {
     border-radius: 8px;
 }
 
+/* below 640: row 2 — full width, scrollable if it ever overflows */
+@media (max-width: 639px) {
+    .tabs {
+        order: 5;
+        flex: 1 0 100%;
+        overflow-x: auto;
+    }
+
+    .tabs button {
+        flex: 1;
+        min-height: 38px;
+    }
+}
+
 .tabs button {
     background: transparent;
     border: none;
@@ -365,9 +475,28 @@ body {
     box-shadow: var(--shadow-1);
 }
 
-/* Search */
+/* Search — wrap pushes right at >=640; below that the icon expands the
+   input (Alpine x-show owns visibility; the media rule hides the icon
+   before Alpine boots). */
+.search-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 0 1 auto;
+    min-width: 0;
+}
+
+@media (min-width: 640px) {
+    .search-wrap {
+        margin-left: auto;
+    }
+
+    .search-btn {
+        display: none;
+    }
+}
+
 .search {
-    margin-left: auto;
     width: 100%;
     max-width: 260px;
     border: 1px solid var(--border);
@@ -390,15 +519,19 @@ body {
     box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
-/* Content Rendering Area */
-.main > div {
-    padding: 2rem;
-    animation: fadeIn 0.3s ease;
-}
-
+/* Content Rendering Area — no blanket `.main > div` rule: padding lives on
+   .board-wrap (every view renders inside it) so #move-status stays unpadded.
+   The fade plays only on first paint / view switches (index.ejs toggles
+   .view-enter keyed on the view name — never on card moves or search). */
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(4px); }
     to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .board-wrap.view-enter {
+        animation: fadeIn 0.3s ease;
+    }
 }
 
 /* Board */
@@ -406,18 +539,25 @@ body {
     padding: 1.5rem;
     overflow: auto;
     flex: 1;
+    /* also the containing block for the .sr-only labels inside the lane —
+       without it they escape this scroller's clip and widen the page */
+    position: relative;
 }
 
+/* >=1024: three flexible columns, capped and centered; below that the same
+   element is the horizontal scroll-snap lane (one column wide + a peek of
+   the next, so the wrapper scrolls x — snap on the same scroller). */
 .columns {
     display: flex;
     gap: 1rem;
     align-items: flex-start;
-    min-height: calc(100vh - var(--topbar-height) - 3rem);
+    min-height: 100%;
 }
 
 .column {
-    flex: 1;
-    min-width: 240px;
+    flex: 0 0 85vw;
+    min-width: 0;
+    scroll-snap-align: start;
     background: var(--surface-sunken);
     border: 1px solid var(--border);
     border-radius: 10px;
@@ -425,6 +565,35 @@ body {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+    .column {
+        flex-basis: 70vw;
+    }
+}
+
+@media (min-width: 1024px) {
+    .column {
+        flex: 1 1 240px;
+        min-width: 240px;
+    }
+
+    .columns {
+        max-width: 1600px;
+        margin-inline: auto;
+    }
+}
+
+.board-wrap {
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+    .board-wrap {
+        scroll-snap-type: none;
+    }
 }
 
 .column-head {
@@ -486,6 +655,11 @@ body {
     padding: 0.75rem;
     cursor: grab;
     transition: border-color 0.2s, box-shadow 0.2s;
+    /* touch: pan-y lets the lane scroll vertically while Sortable's
+       delayOnTouchOnly claims the long-press; no text-selection on drag */
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .card:hover {
@@ -498,6 +672,7 @@ body {
 .card-title {
     font-size: 0.875rem;
     line-height: 1.4;
+    overflow-wrap: anywhere; /* long titles wrap instead of widening the card */
 }
 
 .add-btn {
@@ -659,11 +834,13 @@ body {
     color: var(--accent);
 }
 
-.notes-backdrop {
-    position: fixed;
-    inset: 0;
-    background: var(--backdrop);
-    z-index: 40;
+/* backdrop only where the drawer is a sheet over the board (640–1023);
+   >=1024 the board stays usable beside the drawer; <640 the drawer is the
+   whole screen so the backdrop is never seen */
+@media (min-width: 1024px) {
+    .notes-backdrop {
+        display: none;
+    }
 }
 
 .notes-panel {
@@ -680,13 +857,14 @@ body {
     flex-direction: column;
     gap: 0.75rem;
     padding: 1rem;
+    padding-top: calc(1rem + env(safe-area-inset-top));
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
 }
 
-/* narrow viewports: the drawer is the whole screen, and closing it leaves the
-   board exactly as it was (both layers are x-show'd away, nothing sticky) */
-@media (max-width: 500px) {
+/* phone: full-height sheet, no side border */
+@media (max-width: 639px) {
     .notes-panel {
-        width: 100vw;
+        width: 100%;
         border-left: none;
     }
 }
@@ -933,8 +1111,8 @@ body {
 /* Toast for failed moves */
 .toast {
     position: fixed;
-    bottom: 1.25rem;
-    right: 1.25rem;
+    bottom: max(1.25rem, env(safe-area-inset-bottom));
+    right: max(1.25rem, env(safe-area-inset-right));
     background: var(--surface-inverse);
     color: var(--on-inverse);
     padding: 0.6rem 1rem;
@@ -1032,6 +1210,95 @@ body {
     margin-right: 0.35rem;
 }
 
+/* >=640: table with a sticky first column (title stays visible while
+   Status/Note/Order scroll sideways). */
+@media (min-width: 640px) {
+    .task-table th:first-child,
+    .task-table td:first-child {
+        position: sticky;
+        left: 0;
+        background: var(--bg);
+        z-index: 1;
+    }
+
+    .task-table tr:hover td:first-child {
+        background: var(--surface-muted);
+    }
+}
+
+/* <640: table becomes stacked cards (th labels off, td::before from
+   data-label; title and actions get their own rows). Thead goes sr-only so
+   the sort buttons stay tabbable. */
+@media (max-width: 639px) {
+    .task-table thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+
+    .task-table,
+    .task-table tbody,
+    .task-table tr,
+    .task-table td {
+        display: block;
+    }
+
+    .task-table tr {
+        margin-bottom: 0.75rem;
+        padding: 0.6rem 0.75rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+    }
+
+    .task-table tr:hover {
+        border-color: var(--accent);
+    }
+
+    .task-table tr:hover td {
+        background: transparent;
+    }
+
+    .task-table td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.3rem 0;
+        border: none;
+        white-space: normal;
+    }
+
+    .task-table td[data-label]:not([data-label=""])::before {
+        content: attr(data-label);
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--text-muted);
+    }
+
+    .title-cell {
+        min-width: 0;
+        font-weight: 600;
+        padding-bottom: 0.5rem;
+        margin-bottom: 0.35rem;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .note-cell {
+        white-space: normal;
+    }
+
+    .row-actions {
+        text-align: left;
+        padding-top: 0.5rem;
+    }
+}
+
 .empty-view {
     padding: 1.25rem 0.75rem;
     color: var(--text-muted);
@@ -1076,6 +1343,7 @@ body {
 .list-title {
     flex: 1;
     min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .list-note {
@@ -1084,6 +1352,63 @@ body {
 
 .list-row .notes-btn {
     margin-left: 0;
+}
+
+/* <640: controls (move select, notes button) wrap to a second row under
+   the full-width title */
+@media (max-width: 639px) {
+    .list-row {
+        flex-wrap: wrap;
+    }
+
+    .list-title {
+        flex: 1 0 100%;
+    }
+}
+
+/* ============================================================
+   COARSE POINTER (touch) — 44px targets everywhere, rename pencil
+   and delete X always visible (they can't hover)
+   ============================================================ */
+@media (pointer: coarse) {
+    .icon-btn,
+    .notes-btn,
+    .notes-close,
+    .notes-save,
+    .sort-btn,
+    .add-btn,
+    .continue-x,
+    .project-x,
+    .project-edit {
+        min-height: 44px;
+    }
+
+    .icon-btn,
+    .notes-btn,
+    .notes-close,
+    .notes-save,
+    .add-btn,
+    .continue-x,
+    .project-x,
+    .project-edit {
+        min-width: 44px;
+    }
+
+    .tabs button {
+        min-height: 44px;
+    }
+
+    .move-select {
+        min-height: 44px;
+        max-width: none;
+        padding: 0.35rem 0.5rem;
+    }
+
+    .project-x,
+    .project-edit {
+        opacity: 1;
+        pointer-events: auto;
+    }
 }
 
 /* ============================================================

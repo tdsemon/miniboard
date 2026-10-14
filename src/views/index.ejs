@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="color-scheme" content="light dark">
     <meta name="theme-color" content="#ffffff">
     <!-- no-flash: apply a stored theme before the stylesheet and first paint.
@@ -49,30 +49,91 @@
    <!-- One Alpine object owns the shell: sidebar, the current view/board, and
         the rename-in-progress id. Every board/view re-render goes through
         $store.mb.refresh() (notes.js) so the URL always reflects the store;
-        htmx owns the request and the swap. -->
+        htmx owns the request and the swap. Below 1024 the sidebar is an
+        off-canvas drawer (closed by default); at >=1024 it is a permanent
+        column the menu button collapses. -->
    <div class="app" x-data="{
-        sidebarOpen: true,
+        sidebarOpen: window.matchMedia('(min-width: 1024px)').matches,
         editingId: null,
+        fadedFor: null,
         setView(v) { const ui = this.$store.mb.ui; if (ui.view !== v) { ui.view = v; this.$store.mb.refresh(); } },
-        pickBoard(id) { const ui = this.$store.mb.ui; if (ui.activeBoardId !== id) { ui.activeBoardId = id; this.$store.mb.refresh(); } },
-    }" x-init="$store.mb.refresh()">
-    <aside class="sidebar" x-show="sidebarOpen">
+        pickBoard(id) {
+            const ui = this.$store.mb.ui;
+            if (ui.activeBoardId !== id) {
+                ui.activeBoardId = id;
+                this.$store.mb.refresh();
+                if (window.innerWidth < 1024) this.sidebarOpen = false; // switch closes the drawer
+            }
+        },
+        closeSidebar() {
+            this.sidebarOpen = false;
+            this.$nextTick(() => this.$el.querySelector('.menu-btn')?.focus());
+        },
+        init() {
+            this.$store.mb.refresh();
+            // fade the view root on first paint and view switches only — card
+            // moves and search swaps keep the same view name, so they never
+            // replay the animation (class add forces a restart when it does)
+            window.addEventListener('htmx:afterSettle', () => {
+                const view = this.$store.mb.ui.view;
+                if (view === this.fadedFor) return;
+                this.fadedFor = view;
+                const board = document.getElementById('board');
+                board.classList.remove('view-enter');
+                void board.offsetWidth;
+                board.classList.add('view-enter');
+            });
+        },
+    }" @keydown.escape.window="if (sidebarOpen && window.innerWidth < 1024) closeSidebar()">
+    <!-- inert/aria-hidden when closed: off-canvas transform alone would keep
+         it focusable; display:none takes over at >=1024 via CSS -->
+    <aside class="sidebar" :data-open="sidebarOpen ? 'true' : 'false'"
+        :inert="!sidebarOpen" :aria-hidden="!sidebarOpen" aria-label="Boards">
         <div class="brand">Miniboard</div>
         <!-- filled by GET /boards on load; every add/rename/delete re-swaps it -->
         <nav id="boards" class="projects" hx-get="/boards" hx-trigger="load" hx-swap="outerHTML"></nav>
     </aside>
+    <div class="sidebar-backdrop" aria-hidden="true"
+        :data-open="sidebarOpen ? 'true' : 'false'" @click="sidebarOpen = false"></div>
 
     <main class="main">
         <header class="topbar">
-            <button class="icon-btn" @click="sidebarOpen = !sidebarOpen">☰</button>
+            <button type="button" class="icon-btn menu-btn" @click="sidebarOpen = !sidebarOpen"
+                aria-label="Toggle boards sidebar" :aria-expanded="sidebarOpen ? 'true' : 'false'">☰</button>
+            <span class="topbar-title" x-data="{
+                    name: '',
+                    sync() {
+                        const id = this.$store.mb.ui.activeBoardId;
+                        this.name = document.querySelector('#boards [data-board-id=&quot;' + id + '&quot;]')?.textContent?.trim() ?? '';
+                    },
+                    init() { this.sync(); window.addEventListener('htmx:afterSettle', () => this.sync()); },
+                }" x-text="name"></span>
             <div class="tabs">
                 <button :class="$store.mb.ui.view === 'board' && 'active'" @click="setView('board')">Board</button>
                 <button :class="$store.mb.ui.view === 'table' && 'active'" @click="setView('table')">Table</button>
                 <button :class="$store.mb.ui.view === 'list' && 'active'" @click="setView('list')">List</button>
             </div>
 
-            <input class="search" type="search" name="q" placeholder="Search task..."
-                @input.debounce.300ms="$store.mb.refresh()">
+            <!-- search: inline >=640; below that an icon expands the input
+                 (value is kept, so a collapsed search still filters) -->
+            <div class="search-wrap" x-data="{
+                    open: false,
+                    wide: window.matchMedia('(min-width: 640px)').matches,
+                    init() {
+                        const mq = window.matchMedia('(min-width: 640px)');
+                        mq.addEventListener('change', (e) => { this.wide = e.matches; if (e.matches) this.open = false; });
+                    },
+                }">
+                <button type="button" class="icon-btn search-btn" aria-label="Search tasks" x-show="!wide"
+                    @click="open = !open; if (open) $nextTick(() => $refs.q.focus())">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                        <circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path>
+                    </svg>
+                </button>
+                <input class="search" type="search" name="q" placeholder="Search task..." x-ref="q" x-show="open || wide"
+                    @input.debounce.300ms="$store.mb.refresh()"
+                    @keydown.escape="open = false">
+            </div>
 
             <!-- primary theme control: 44px, aria-pressed reflects effective
                  theme, click animates via startViewTransition in theme.js -->
