@@ -18,7 +18,9 @@ DATA_FILE=/tmp/mb.json npm run dev  # optional: data file path (default data/min
 
 No build step. Client libraries are vendored under `public/vendor` (htmx 2.0.4,
 Alpine 3.17.4, its persist plugin, SortableJS 1.15.6) and served by
-`express.static` — nothing is fetched from a CDN at runtime.
+`express.static` — nothing is fetched from a CDN at runtime. Icons are ionicons
+8.0.13 (MIT), inlined as a sprite at build time (`npm run icons`, committed
+output); see `public/vendor/ionicons-LICENSE.txt`.
 
 Data lives in one JSON file (`data/miniboard.json`, gitignored; override with
 `DATA_FILE`). Every mutation schedules a debounced (~200ms) atomic write

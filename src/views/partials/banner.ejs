@@ -6,5 +6,5 @@
         <strong x-text="title"></strong> - <span x-text="text"></span> - <span x-text="when"></span>
     </p>
     <button type="button" class="continue-open" @click="reopen()">Open</button>
-    <button type="button" class="continue-x" @click="dismiss()" aria-label="Dismiss continue banner">×</button>
+    <button type="button" class="continue-x" @click="dismiss()" aria-label="Dismiss continue banner"><%- icon("close-outline") %></button>
 </div>

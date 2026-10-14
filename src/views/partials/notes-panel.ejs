@@ -7,7 +7,7 @@
     role="dialog" aria-labelledby="notes-title">
     <div class="notes-head">
         <h2 id="notes-title"><%= task.title %></h2>
-        <button type="button" class="notes-close" @click="closeIt()" aria-label="Close notes">×</button>
+        <button type="button" class="notes-close" @click="closeIt()" aria-label="Close notes"><%- icon("close-outline") %></button>
     </div>
     <form class="notes-form" onsubmit="return false">
         <!-- rule 5: inline prompt, not a modal. restore is the focused default
@@ -15,8 +15,8 @@
         <div class="draft-bar" x-show="prompt" role="status">
             <span x-show="prompt === 'prompt-restore'">You have a local draft of this note that isn't on the server yet.</span>
             <span x-show="prompt === 'prompt-server-reset'">Server was reset — your local draft is newer than the server's copy.</span>
-            <button type="button" class="draft-restore" @click="restoreDraft()">Restore</button>
-            <button type="button" class="draft-discard" @click="discardDraft()">Discard</button>
+            <button type="button" class="draft-restore" @click="restoreDraft()"><%- icon("arrow-undo-outline") %>Restore</button>
+            <button type="button" class="draft-discard" @click="discardDraft()"><%- icon("trash-outline") %>Discard</button>
         </div>
         <!-- rule 6: one bar for both conflict sources — a 409 mid-save, and an
              open whose local draft is older than the server (step 6's
@@ -57,13 +57,13 @@
                 hx-trigger="click"
                 hx-sync="closest form:queue last">Save</button>
             <button type="button" class="notes-retry" x-show="status === 'error'"
-                @click="retry()">Retry</button>
+                @click="retry()"><%- icon("reload-outline") %>Retry</button>
             <div class="note-status" aria-live="polite">
                 <span x-show="status === 'editing'">editing…</span>
                 <span x-show="status === 'dirty'">unsaved changes</span>
-                <span x-show="status === 'saving'">saving…</span>
-                <span x-show="status === 'saved'" x-text="savedLabel"></span>
-                <span x-show="status === 'error'">save failed</span>
+                <span x-show="status === 'saving'"><span class="sync-spin" aria-hidden="true"><%- icon("sync-outline") %></span>saving…</span>
+                <span x-show="status === 'saved'"><%- icon("cloud-done-outline") %><span x-text="savedLabel"></span></span>
+                <span x-show="status === 'error'"><%- icon("alert-circle-outline") %>save failed</span>
                 <!-- server swaps land here: OOB version input does the real work,
                      this div stays empty so Alpine keeps the visible labels -->
                 <div id="note-status-swap"></div>

@@ -55,8 +55,9 @@ test("board + view routes", async (t) => {
         assert.deepEqual(rowIds(byStatus), [1, 3, 2, 4]);
         const desc = await (await fetch(`${base}/boards/1?view=table&sort=status&dir=desc`)).text();
         assert.deepEqual(rowIds(desc), [4, 2, 1, 3]);
-        // sort headers carry the arrow for the active column
-        assert.match(desc, /Status\s*↓/);
+        // sort headers carry the chevron for the active column
+        // (the fragment escapes quotes, so match #i-chevron-down-outline)
+        assert.ok(desc.includes("#i-chevron-down-outline"), "desc header should render the down chevron");
     });
 
     await t.test("list view groups rows under column headings", async () => {

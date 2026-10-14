@@ -26,16 +26,11 @@
                      reveal but stays tabbable; coarse pointers get it permanently -->
                 <button type="button" class="project-edit" data-rename-btn="<%= b.id %>"
                     title="Rename board" aria-label="rename <%= b.name %>"
-                    @click="startRename(<%= b.id %>)">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M12 20h9"></path>
-                        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
-                    </svg>
-                </button>
+                    @click="startRename(<%= b.id %>)"><%- icon("pencil-outline") %></button>
                 <!-- last board is the app: no delete button, and the route 400s as a backstop -->
                 <button type="button" class="project-x" title="Delete board" aria-label="Delete board <%= b.name %>"
                     hx-delete="/boards/<%= b.id %>" hx-target="#boards" hx-swap="outerHTML"
-                    hx-confirm="Delete this board and all its tasks?">×</button>
+                    hx-confirm="Delete this board and all its tasks?"><%- icon("trash-outline") %></button>
             <% } %>
         </div>
     <% }) %>

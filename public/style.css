@@ -59,6 +59,11 @@
     --dur-3: 300ms;
     --ease-out: cubic-bezier(0.2, 0, 0, 1);
 
+    /* --- primitives: icon sizes (multiples of 8, per ionicons docs) --- */
+    --icon-sm: 16px;
+    --icon-md: 24px;
+    --icon-lg: 32px;
+
     /* --- primitives: layout --- */
     --sidebar-width: 260px;
     --topbar-height: 60px;
@@ -132,6 +137,31 @@ body {
 /* Alpine hides cloaked elements until its first init (theme icons) */
 [x-cloak] {
     display: none !important;
+}
+
+/* Icons — one rule; colour is inherited via currentColor so dark mode, hover,
+   accent, disabled and forced-colors need nothing extra. */
+.icon {
+    width: 1.25em;
+    height: 1.25em;
+    flex: none;
+    vertical-align: -0.2em;
+}
+
+/* spinning sync icon while a note is saving — only when motion is welcome */
+@media (prefers-reduced-motion: no-preference) {
+    .sync-spin .icon {
+        animation: icon-spin 1s linear infinite;
+    }
+    .theme-toggle .icon {
+        transition: transform var(--dur-2) var(--ease-out), opacity var(--dur-2) var(--ease-out);
+    }
+    .theme-toggle[aria-pressed="true"] .icon {
+        transform: rotate(15deg);
+    }
+}
+@keyframes icon-spin {
+    to { transform: rotate(360deg); }
 }
 
 /* Layout Structure

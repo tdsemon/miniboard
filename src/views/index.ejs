@@ -39,12 +39,13 @@
          before Alpine's start(). -->
     <script defer src="/vendor/alpine-persist.min.js"></script>
     <script defer src="/theme.js"></script>
+    <script src="/icons.js"></script>
     <script type="module" src="/notes.js"></script>
     <script defer src="/vendor/alpine.min.js"></script>
 
 </head>
 <body>
-
+   <%- include("partials/icon-sprite") %>
 
    <!-- One Alpine object owns the shell: sidebar layout mode, the current
         view/board, and the rename-in-progress id. Every board/view re-render
@@ -195,7 +196,7 @@
             <div class="brand">Miniboard</div>
             <!-- drawer-only close control; CSS hides it in docked mode -->
             <button type="button" class="icon-btn sidebar-close" @click="closeSidebar()"
-                aria-label="close sidebar" x-show="layout === 'drawer'" x-cloak>✕</button>
+                aria-label="close sidebar" x-show="layout === 'drawer'" x-cloak><%- icon("close-outline") %></button>
         </div>
         <!-- filled by GET /boards on load; every add/rename/delete re-swaps it -->
         <nav id="boards" class="projects" hx-get="/boards" hx-trigger="load" hx-swap="outerHTML"></nav>
@@ -206,7 +207,7 @@
     <main class="main">
         <header class="topbar">
             <button type="button" class="icon-btn menu-btn" @click="toggleSidebar()"
-                aria-label="Toggle boards sidebar" :aria-expanded="sidebarOpen ? 'true' : 'false'">☰</button>
+                aria-label="Toggle boards sidebar" :aria-expanded="sidebarOpen ? 'true' : 'false'"><%- icon("menu-outline") %></button>
             <span class="topbar-title" x-data="{
                     name: '',
                     sync() {
@@ -232,11 +233,7 @@
                     },
                 }">
                 <button type="button" class="icon-btn search-btn" aria-label="Search tasks" x-show="!wide"
-                    @click="open = !open; if (open) $nextTick(() => $refs.q.focus())">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-                        <circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path>
-                    </svg>
-                </button>
+                    @click="open = !open; if (open) $nextTick(() => $refs.q.focus())"><%- icon("search-outline") %></button>
                 <input class="search" type="search" name="q" placeholder="Search task..." x-ref="q" x-show="open || wide"
                     @input.debounce.300ms="$store.mb.refresh()"
                     @keydown.escape="open = false">
@@ -248,15 +245,8 @@
                 @click="$store.theme.toggle($el)"
                 :aria-pressed="$store.theme.effective === 'dark' ? 'true' : 'false'"
                 :aria-label="$store.theme.effective === 'dark' ? 'switch to light theme' : 'switch to dark theme'">
-                <svg x-show="$store.theme.effective !== 'dark'" x-cloak viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-                    <circle cx="12" cy="12" r="4"></circle>
-                    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
-                </svg>
-                <svg x-show="$store.theme.effective === 'dark'" x-cloak viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-                </svg>
+                <span x-show="$store.theme.effective !== 'dark'" x-cloak><%- icon("sunny-outline") %></span>
+                <span x-show="$store.theme.effective === 'dark'" x-cloak><%- icon("moon-outline") %></span>
             </button>
 
         </header>

@@ -5,9 +5,9 @@
     <div class="card-action">
         <span class="note-dot" title="Has a note"></span>
         <%- include("move-select", {task, columns, target: "#column-" + task.status, swap: "outerHTML"}) %>
-        <button class="notes-btn" id="notes-btn-<%= task.id %>"
-            @click="$dispatch('notes-open', { id: <%= task.id %> })">Note</button>
-        <button title="Delete" hx-delete="/tasks/<%= task.id %>" hx-target="#column-<%= task.status %>" hx-swap="outerHTML" hx-confirm="Delete this task?"
-            @htmx:after-request="if ($event.detail.successful && $store.notes.openId === <%= task.id %>) $dispatch('notes-close-force')">X</button>
+        <button class="notes-btn" id="notes-btn-<%= task.id %>" title="Note" aria-label="Note on <%= task.title %>"
+            @click="$dispatch('notes-open', { id: <%= task.id %> })"><%- icon("document-text-outline") %></button>
+        <button title="Delete" aria-label="Delete task <%= task.title %>" hx-delete="/tasks/<%= task.id %>" hx-target="#column-<%= task.status %>" hx-swap="outerHTML" hx-confirm="Delete this task?"
+            @htmx:after-request="if ($event.detail.successful && $store.notes.openId === <%= task.id %>) $dispatch('notes-close-force')"><%- icon("trash-outline") %></button>
     </div>
 </div>

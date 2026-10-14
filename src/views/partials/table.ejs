@@ -12,10 +12,10 @@
             }
         }">
             <tr>
-                <th scope="col"><button type="button" class="sort-btn" @click="sort('title')">Title<%= sort === "title" ? (dir === "asc" ? " ↑" : " ↓") : "" %></button></th>
-                <th scope="col"><button type="button" class="sort-btn" @click="sort('status')">Status<%= sort === "status" ? (dir === "asc" ? " ↑" : " ↓") : "" %></button></th>
-                <th scope="col"><button type="button" class="sort-btn" @click="sort('note')">Note<%= sort === "note" ? (dir === "asc" ? " ↑" : " ↓") : "" %></button></th>
-                <th scope="col"><button type="button" class="sort-btn" @click="sort('order')">Order<%= sort === "order" ? (dir === "asc" ? " ↑" : " ↓") : "" %></button></th>
+                <th scope="col"><button type="button" class="sort-btn" @click="sort('title')">Title<%= sort === "title" ? (dir === "asc" ? " " + icon("chevron-up-outline") : " " + icon("chevron-down-outline")) : "" %></button></th>
+                <th scope="col"><button type="button" class="sort-btn" @click="sort('status')">Status<%= sort === "status" ? (dir === "asc" ? " " + icon("chevron-up-outline") : " " + icon("chevron-down-outline")) : "" %></button></th>
+                <th scope="col"><button type="button" class="sort-btn" @click="sort('note')">Note<%= sort === "note" ? (dir === "asc" ? " " + icon("chevron-up-outline") : " " + icon("chevron-down-outline")) : "" %></button></th>
+                <th scope="col"><button type="button" class="sort-btn" @click="sort('order')">Order<%= sort === "order" ? (dir === "asc" ? " " + icon("chevron-up-outline") : " " + icon("chevron-down-outline")) : "" %></button></th>
             </tr>
         </thead>
         <tbody>
@@ -33,12 +33,12 @@
                     </td>
                     <td class="order-cell" data-label="Order"><%= task.order %></td>
                     <td class="row-actions">
-                        <button class="notes-btn" id="notes-btn-<%= task.id %>"
-                            @click="$dispatch('notes-open', { id: <%= task.id %> })">Note</button>
-                        <button title="Delete" hx-delete="/tasks/<%= task.id %>" hx-target="#board" hx-swap="innerHTML"
+                        <button class="notes-btn" id="notes-btn-<%= task.id %>" title="Note" aria-label="Note on <%= task.title %>"
+                            @click="$dispatch('notes-open', { id: <%= task.id %> })"><%- icon("document-text-outline") %></button>
+                        <button title="Delete" aria-label="Delete task <%= task.title %>" hx-delete="/tasks/<%= task.id %>" hx-target="#board" hx-swap="innerHTML"
                             hx-vals='js:({view: "<%= view %>", sort: "<%= sort %>", dir: "<%= dir %>", q: document.querySelector(".search")?.value ?? ""})'
                             hx-confirm="Delete this task?"
-                            @htmx:after-request="if ($event.detail.successful && $store.notes.openId === <%= task.id %>) $dispatch('notes-close-force')">X</button>
+                            @htmx:after-request="if ($event.detail.successful && $store.notes.openId === <%= task.id %>) $dispatch('notes-close-force')"><%- icon("trash-outline") %></button>
                     </td>
                 </tr>
             <% }) %>
