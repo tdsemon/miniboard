@@ -5,6 +5,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import app from "../src/app.js";
+import { listBoards, getTask, columns as COLUMNS, findTask, getNote } from "../src/data/tasks.js";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -75,5 +76,63 @@ test("no ion-icon / CDN / leftover glyph usage in src or public", () => {
         const src = readFileSync(file, "utf8");
         const m = src.match(blocklist);
         assert.equal(m, null, `${path.relative(root, file)}: forbidden token "${m && m[0]}"`);
+    }
+});
+
+// --- guard: escaped icon markup. icon() returns a <svg> string; if a template
+// prints it through the escaped form (<%=) the browser shows the literal
+// "<svg class=..." as text. These two tests make that class of bug loud.
+
+test("lint: every icon( call in src/views is printed unescaped", () => {
+    const views = walk(path.join(root, "src/views"), [".ejs"]);
+    let calls = 0;
+    for (const file of views) {
+        const src = readFileSync(file, "utf8");
+        // strip <%# comments so a comment mentioning the escaped form can't trip this
+        const code = src.replace(/<%#[\s\S]*?%>/g, "");
+        // any icon( occurring inside an escaped <%= ... %> block is the bug
+        for (const m of code.matchAll(/<%=[\s\S]*?%>/g)) {
+            if (/\bicon\s*\(/.test(m[0])) {
+                assert.fail(`${path.relative(root, file)}: icon() printed inside an escaped <%= ... %> block — use the unescaped form`);
+            }
+        }
+        for (const m of code.matchAll(/\bicon\s*\(/g)) calls++;
+        // every icon( must live in an unescaped block
+        const unescaped = [...code.matchAll(/<%-[\s\S]*?%>/g)].map((m) => m[0]).join("\n");
+        const escaped = [...code.matchAll(/<%=[\s\S]*?%>/g)].map((m) => m[0]).join("\n");
+        const inEscapedOnly = (code.match(/\bicon\s*\(/g) || []).length - (unescaped.match(/\bicon\s*\(/g) || []).length - (escaped.match(/\bicon\s*\(/g) || []).length;
+        assert.equal(inEscapedOnly, 0, `${path.relative(root, file)}: icon() call outside any output block`);
+    }
+    assert.ok(calls > 0, "expected at least one icon() call in views");
+});
+
+test("rendered views never contain escaped svg/use/path entities", async () => {
+    const render = (name, data) => new Promise((resolve, reject) =>
+        app.render(name, data, (err, html) => (err ? reject(err) : resolve(html))));
+
+    const cases = [];
+    // shell + sidebar + banner
+    cases.push(["index", await render("index", {})]);
+    cases.push(["partials/boards", await render("partials/boards", { boards: listBoards() })]);
+    // board / list
+    const boardData = { boards: listBoards(), boardId: 1, view: "board", sort: "order", dir: "asc", q: "", columns: COLUMNS, tasks: getTask(1) };
+    cases.push(["board", await render("partials/board", boardData)]);
+    cases.push(["list", await render("partials/list", { ...boardData, view: "list" })]);
+    // table sorted by every column, both directions
+    for (const sort of ["title", "status", "note", "order"]) {
+        for (const dir of ["asc", "desc"]) {
+            cases.push([`table ${sort}/${dir}`, await render("partials/table", { ...boardData, view: "table", sort, dir })]);
+        }
+    }
+    // notes panel + conflict fragment
+    const task = findTask(1);
+    cases.push(["notes-panel", await render("partials/notes-panel", { task, note: getNote(1) })]);
+    cases.push(["note-conflict", await render("partials/note-conflict", { version: 2, updatedAt: "2026-10-13T10:00:00.000Z", note: "hello" })]);
+
+    const bad = /&lt;svg|&lt;use|&lt;path/;
+    for (const [label, html] of cases) {
+        const m = html.match(bad);
+        assert.equal(m, null, `${label}: escaped icon markup leaked into output ("${m && m[0]}")`);
+        assert.ok(!html.includes("<ion-icon"), `${label}: ion-icon web component`);
     }
 });
