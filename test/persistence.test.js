@@ -3,6 +3,22 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const root = path.join(here, "..");
+
+const waitForPort = async (port) => {
+    for (let i = 0; i < 100; i++) {
+        try {
+            const r = await fetch(`http://localhost:${port}/`);
+            if (r.ok) return;
+        } catch { /* not up yet */ }
+        await new Promise((r) => setTimeout(r, 50));
+    }
+    throw new Error(`server on :${port} never came up`);
+};
 
 const DATA_FILE = process.env.DATA_FILE;
 const dir = path.dirname(DATA_FILE);
@@ -103,13 +119,64 @@ test("persistence", async (t) => {
         assert.equal(shaped.listBoards().length, 3);
         assert.equal(fs.readdirSync(dir).filter((f) => f.startsWith("miniboard.json.bak-")).length, 2);
     });
-
     await t.test("missing file seeds fresh", async () => {
         reset();
         const m = await load();
-        assert.deepEqual(m.listBoards().map((x) => x.name), ["Designs", "Branding", "Email Template"]);
+        assert.deepEqual(m.listBoards().map((x) => x.name),
+            ["Designs", "Branding", "Email Template"]);
         assert.equal(m.getTask(1).length, 4);
         assert.equal(m.findTask(1).version, 0);
         assert.ok(!fs.existsSync(DATA_FILE)); // seeding alone writes nothing
+    });
+
+    await t.test("board rename persists to the data file (via the debounce, no manual flush)", async () => {
+        reset();
+        const a = await load();
+        a.renameBoard(2, "Renamed via debounce");
+        assert.equal(a.findBoard(2).name, "Renamed via debounce");
+        // scheduleSave debounces ~200ms; wait it out and assert the bytes on
+        // disk, so this covers the real "did the debounce actually fire" path
+        await new Promise((r) => setTimeout(r, 400));
+        const onDisk = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
+        const diskBoard = onDisk.boards.find((x) => x.id === 2);
+        assert.equal(diskBoard.name, "Renamed via debounce");
+        // and a fresh module boot (== restart) sees the same name
+        const b = await load();
+        assert.equal(b.findBoard(2).name, "Renamed via debounce");
+    });
+
+    await t.test("rename survives a real server restart (SIGTERM flush + fresh boot)", async () => {
+        reset();
+        const port = 3211 + Math.floor(Math.random() * 200);
+        const boot = () => spawn(process.execPath, ["server.js"], {
+            cwd: root,
+            env: { ...process.env, PORT: String(port), DATA_FILE },
+            stdio: ["ignore", "pipe", "inherit"],
+        });
+
+        // boot 1: rename through the real HTTP route, then SIGTERM (server.js
+        // flushes synchronously on that signal before exiting)
+        let s1 = boot();
+        await waitForPort(port);
+        const r = await fetch(`http://localhost:${port}/boards/1`, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({ name: "Survives restart" }),
+        });
+        assert.equal(r.status, 200);
+        await new Promise((resolve) => { s1.once("exit", resolve); s1.kill("SIGTERM"); });
+
+        // the name must already be on disk before boot 2 starts
+        const onDisk = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
+        assert.equal(onDisk.boards.find((x) => x.id === 1).name, "Survives restart");
+
+        // boot 2: fresh process, same DATA_FILE — the rename is still there.
+        // boards render client-side via htmx (GET /boards), so check that
+        // endpoint rather than the shell HTML.
+        let s2 = boot();
+        await waitForPort(port);
+        const boardsHtml = await (await fetch(`http://localhost:${port}/boards`)).text();
+        assert.ok(boardsHtml.includes("Survives restart"), "restart: renamed board missing from fresh boot");
+        await new Promise((resolve) => { s2.once("exit", resolve); s2.kill("SIGTERM"); });
     });
 });

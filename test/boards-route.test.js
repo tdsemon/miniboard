@@ -134,9 +134,20 @@ test("board + view routes", async (t) => {
         await fetch(`${base}/boards/1`, form("name=Designs"));
     });
 
-    await t.test("rename caps a too-long name at 40 characters", async () => {
+    await t.test("rename rejects a too-long name with a 400 (no silent truncate)", async () => {
         const long = "x".repeat(60);
+        const before = findBoard(1).name;
         const r = await fetch(`${base}/boards/1`, form(`name=${long}`));
+        assert.equal(r.status, 400);
+        assert.match(await r.text(), /too long/i);
+        assert.equal(findBoard(1).name, before); // unchanged, not truncated
+        // a new board rejects the same way
+        const created = await fetch(`${base}/boards`, form(`name=${long}`));
+        assert.equal(created.status, 400);
+    });
+
+    await t.test("rename accepts exactly 40 characters", async () => {
+        const r = await fetch(`${base}/boards/1`, form(`name=${"y".repeat(40)}`));
         assert.equal(r.status, 200);
         assert.equal(findBoard(1).name.length, 40);
         await fetch(`${base}/boards/1`, form("name=Designs"));

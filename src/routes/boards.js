@@ -9,7 +9,16 @@ const renderPartial = (res, name, data) =>
     });
 
 const NAME_MAX = 40;
-const cleanName = (raw) => String(raw ?? "").trim().slice(0, NAME_MAX);
+// trim for storage, but REJECT an over-long name with a 400 rather than
+// silently truncating (the client maxlength=40 keeps the normal path under
+// the cap; this is the trust-boundary backstop). Returns null on over-length.
+const cleanName = (raw) => {
+    const name = String(raw ?? "").trim();
+    if (name.length > NAME_MAX) return null;
+    return name;
+};
+const NAME_TOO_LONG = `Board name is too long (max ${NAME_MAX} characters)`;
+const NAME_EMPTY = "Board name can't be empty";
 
 const viewName = (view) => (view === "table" || view === "list" ? view : "board");
 
@@ -51,14 +60,16 @@ router.get("/boards/:id", async (req, res) => {
 
 router.post("/boards", (req, res) => {
     const name = cleanName(req.body?.name);
-    if (!name) return res.status(400).send("");
+    if (name === null) return res.status(400).send(NAME_TOO_LONG);
+    if (!name) return res.status(400).send(NAME_EMPTY);
     addBoard(name);
     res.render("partials/boards", { boards: listBoards() });
 });
 
 router.post("/boards/:id", (req, res) => {
     const name = cleanName(req.body?.name);
-    if (!name) return res.status(400).send("");
+    if (name === null) return res.status(400).send(NAME_TOO_LONG);
+    if (!name) return res.status(400).send(NAME_EMPTY);
     if (!renameBoard(req.params.id, name)) return res.status(404).send("");
     res.render("partials/boards", { boards: listBoards() });
 });
