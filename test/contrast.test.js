@@ -20,12 +20,18 @@ const css = readFileSync(path.join(dir, "..", "public", "style.css"), "utf8");
 const PAIRS = [
     ["--text", "--bg", 4.5],
     ["--text", "--surface", 4.5],
-    ["--text-muted", "--surface", 4.5],
     ["--text", "--surface-muted", 4.5], // table hover, tabs container, pills
+    ["--text", "--surface-raised", 4.5],
+    ["--text", "--surface-sunken", 4.5],
+    ["--text-muted", "--surface", 4.5],
+    ["--text-muted", "--surface-muted", 4.5],
+    ["--text-muted", "--surface-sunken", 4.5], // placeholders, disabled, column label
     ["--on-accent", "--accent", 4.5],
     ["--accent", "--surface", 4.5],
+    ["--accent", "--surface-sunken", 4.5], // has-note pill, active sort label
     ["--accent", "--accent-soft", 4.5], // active sidebar item, banner text
     ["--danger", "--surface", 4.5],
+    ["--danger", "--surface-sunken", 4.5], // conflict / error bars
     ["--on-inverse", "--surface-inverse", 4.5], // toast text both themes
 ];
 

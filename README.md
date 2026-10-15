@@ -102,11 +102,57 @@ last-edited snippet (with its board id) and the current board + view, so a
 reload or a closed tab reopens the drawer where it was and the continue banner
 offers a one-click return — switching boards first if the note lives elsewhere.
 
+## Design system
+
+All styling lives in `public/style.css`. Components reference **only** the
+semantic token layer declared in `:root` — primitives (`--n-*`, `--indigo-*`,
+`--s-*`, `--r-*`, `--fs-*`) are the raw values, semantic tokens (`--bg`,
+`--surface*`, `--text*`, `--accent*`, `--shadow-*`, `--focus-ring`) are what
+components use. Colour primitives are never referenced outside `:root`
+(enforced by review; `test/contrast.test.js` parses `:root` and fails on an
+unresolved `var()` chain).
+
+Both themes come from one declaration per token via `light-dark(light, dark)`.
+Which side applies is decided by `color-scheme`, which the `data-theme`
+mechanism sets — there is no second set of rules per theme.
+
+**Adding a themed colour:** add the primitive under `--- primitives ---`, add
+one semantic token under `--- semantic ---` using `light-dark()`, then use only
+the semantic name. Add the new pair to `PAIRS` in `test/contrast.test.js` so
+the gate checks it in both themes.
+
+**Scales:** spacing `--s-1..6` (4→32px), radii `--r-sm..xl` + `--r-full`,
+type `--fs-xs..xl` each paired with its own `--lh-*`, weights `--fw-regular|
+medium|semibold`, motion `--dur-1|2|3` + `--ease-out`, icons `--icon-sm|md|lg`.
+Layout constants `--sidebar-width`, `--topbar-height`, `--notes-width`.
+Breakpoints are the two in use: `639px` (phone) and `1023px`/`1024px`
+(desktop starts).
+
+**Focus:** one `:focus-visible` rule draws the ring (`--focus-ring`) for every
+interactive element. Components do not declare their own outline.
+
+**Motion:** every animation and transition sits inside
+`@media (prefers-reduced-motion: no-preference)`. A single
+`@media (prefers-reduced-motion: reduce)` rule collapses all durations and
+kills transforms, so an animation added later is opted out automatically.
+
+**Forced colors:** `@media (forced-colors: active)` at the end of the file
+gives shape/border fallbacks to anything that was told apart by colour alone
+(status dots, pills, hover, focus, the open-card ring).
+
+**Icons:** `app.locals.icon(name)` / `window.Icon(name)` render an `<svg
+use>` pointing at the sprite (`src/views/partials/icon-sprite.ejs`, generated
+by `npm run icons`). Print it unescaped — `<%- icon("name") %>`, never `<%=
+%>` — and never inject it through `x-html`.
+
 ## Known gaps
 
 - **Single process only** — the JSON file is written with atomic renames, but two servers sharing one `DATA_FILE` would overwrite each other.
 - **Debounced writes** — a hard kill (SIGKILL, power loss) can lose the last ~200ms of edits; only SIGINT/SIGTERM flush first.
 - **Single user** — no accounts, no sharing, no realtime sync beyond the two-tab localStorage rules.
 - **Plain-text notes** — no markdown rendering or preview.
-- **No automated browser tests** — node:test covers the server, persistence and the pure draft logic; drag, alt+arrow and the drawer flows are checked by hand.
+- **No automated browser tests for interaction** — node:test covers the
+  server, persistence and the pure draft logic; `test/icons.visual.test.js`
+  uses Playwright for icon/markup rendering only. Drag, alt+arrow and the
+  drawer flows are checked by hand.
 - **Single-tab-wins UI state** — the focused tab ignores the others, so a second tab cannot steal the open note.

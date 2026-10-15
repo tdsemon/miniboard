@@ -19,5 +19,11 @@
             <% }) %>
         </section>
     <% }) %>
-    <% if (!tasks.length) { %><p class="empty-view">No tasks<%= q ? ` matching “${q}”` : "" %> on this board.</p><% } %>
+    <% if (!tasks.length) { %>
+        <% if (q) { %>
+            <%- include("empty-state", {kind: "search", message: `no tasks match “${q}”`, action: "clear search", actionAttr: `@click="document.querySelector('.search').value = ''; $store.mb.refresh()"`}) %>
+        <% } else { %>
+            <%- include("empty-state", {kind: "list", message: "no tasks on this board yet"}) %>
+        <% } %>
+    <% } %>
 </div>

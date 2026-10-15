@@ -16,10 +16,10 @@
                     the unescaped form. Printing it with the escaped form renders the
                     literal "<svg..." as visible text. aria-sort on the th is what AT
                     announces; the button's own accessible name stays the column name. %>
-                <th scope="col" aria-sort="<%= sort === "title" ? (dir === "asc" ? "ascending" : "descending") : "none" %>"><button type="button" class="sort-btn" @click="sort('title')">Title<%- sort === "title" ? " " + icon(dir === "asc" ? "chevron-up-outline" : "chevron-down-outline") : "" %></button></th>
-                <th scope="col" aria-sort="<%= sort === "status" ? (dir === "asc" ? "ascending" : "descending") : "none" %>"><button type="button" class="sort-btn" @click="sort('status')">Status<%- sort === "status" ? " " + icon(dir === "asc" ? "chevron-up-outline" : "chevron-down-outline") : "" %></button></th>
-                <th scope="col" aria-sort="<%= sort === "note" ? (dir === "asc" ? "ascending" : "descending") : "none" %>"><button type="button" class="sort-btn" @click="sort('note')">Note<%- sort === "note" ? " " + icon(dir === "asc" ? "chevron-up-outline" : "chevron-down-outline") : "" %></button></th>
-                <th scope="col" aria-sort="<%= sort === "order" ? (dir === "asc" ? "ascending" : "descending") : "none" %>"><button type="button" class="sort-btn" @click="sort('order')">Order<%- sort === "order" ? " " + icon(dir === "asc" ? "chevron-up-outline" : "chevron-down-outline") : "" %></button></th>
+                <th scope="col" aria-sort="<%= sort === "title" ? (dir === "asc" ? "ascending" : "descending") : "none" %>"><button type="button" class="sort-btn<%- sort === "title" ? " is-active" : "" %>" @click="sort('title')">Title<%- " " + icon(sort === "title" && dir === "asc" ? "chevron-up-outline" : "chevron-down-outline") %></button></th>
+                <th scope="col" aria-sort="<%= sort === "status" ? (dir === "asc" ? "ascending" : "descending") : "none" %>"><button type="button" class="sort-btn<%- sort === "status" ? " is-active" : "" %>" @click="sort('status')">Status<%- " " + icon(sort === "status" && dir === "asc" ? "chevron-up-outline" : "chevron-down-outline") %></button></th>
+                <th scope="col" aria-sort="<%= sort === "note" ? (dir === "asc" ? "ascending" : "descending") : "none" %>"><button type="button" class="sort-btn<%- sort === "note" ? " is-active" : "" %>" @click="sort('note')">Note<%- " " + icon(sort === "note" && dir === "asc" ? "chevron-up-outline" : "chevron-down-outline") %></button></th>
+                <th scope="col" aria-sort="<%= sort === "order" ? (dir === "asc" ? "ascending" : "descending") : "none" %>"><button type="button" class="sort-btn<%- sort === "order" ? " is-active" : "" %>" @click="sort('order')">Order<%- " " + icon(sort === "order" && dir === "asc" ? "chevron-up-outline" : "chevron-down-outline") %></button></th>
             </tr>
         </thead>
         <tbody>
@@ -48,5 +48,11 @@
             <% }) %>
         </tbody>
     </table>
-    <% if (!tasks.length) { %><p class="empty-view">No tasks<%= q ? ` matching “${q}”` : "" %> on this board.</p><% } %>
+    <% if (!tasks.length) { %>
+        <% if (q) { %>
+            <%- include("empty-state", {kind: "search", message: `no tasks match “${q}”`, action: "clear search", actionAttr: `@click="document.querySelector('.search').value = ''; $store.mb.refresh()"`}) %>
+        <% } else { %>
+            <%- include("empty-state", {kind: "table", message: "no tasks on this board yet"}) %>
+        <% } %>
+    <% } %>
 </div>

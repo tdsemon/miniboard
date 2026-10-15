@@ -1,4 +1,7 @@
 <%- include("banner") %>
+<% if (!tasks.length) { %>
+    <%- include("empty-state", {kind: "board", message: "this board is empty", action: "add your first task", actionAttr: `@click="document.querySelector('.add-wrap .add-btn')?.click()"`}) %>
+<% } %>
 <div class="columns">
     <% columns.forEach(col=> { %>
         <%- include("column", {col, tasks, columns, boardId, oob: false}) %>

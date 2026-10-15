@@ -10,7 +10,7 @@
     --n-50: #f9fafb;
     --n-100: #f3f4f6;
     --n-200: #e5e7eb;
-    --n-500: #6b7280;
+    --n-500: #656d7a;
     --n-900: #111827;
 
     /* --- primitives: neutral, dark steps (layered, never #000/#fff) --- */
@@ -36,8 +36,7 @@
     --red-600: #dc2626;
     --red-400: #f87171;
 
-    /* --- primitives: radii / spacing / type / motion (adopted in
-           components from stage 4 — colours must never use these) --- */
+    /* --- primitives: radii / spacing / type / motion --- */
     --r-sm: 6px;
     --r-md: 8px;
     --r-lg: 10px;
@@ -49,11 +48,21 @@
     --s-4: 16px;
     --s-5: 24px;
     --s-6: 32px;
+    /* type scale: 5 steps, each with its own line-height */
     --fs-xs: clamp(0.7rem, 0.68rem + 0.1vw, 0.75rem);
+    --lh-xs: 1.4;
     --fs-sm: clamp(0.8rem, 0.78rem + 0.1vw, 0.875rem);
+    --lh-sm: 1.45;
     --fs-md: clamp(0.9rem, 0.87rem + 0.15vw, 1rem);
+    --lh-md: 1.55;
     --fs-lg: clamp(1rem, 0.96rem + 0.2vw, 1.125rem);
+    --lh-lg: 1.4;
     --fs-xl: clamp(1.1rem, 1.04rem + 0.3vw, 1.375rem);
+    --lh-xl: 1.3;
+    /* weights used anywhere: 400 body, 500 control, 600 emphasis */
+    --fw-regular: 400;
+    --fw-medium: 500;
+    --fw-semibold: 600;
     --dur-1: 120ms;
     --dur-2: 200ms;
     --dur-3: 300ms;
@@ -89,11 +98,12 @@
     --dot-progress: var(--accent);
     --dot-done: light-dark(var(--green-500), var(--green-400));
     --backdrop: light-dark(rgba(17, 24, 39, 0.25), rgba(5, 7, 12, 0.55));
-    /* stage 3's pull veil: in each mode it previews the OTHER mode's tone */
-    --veil: light-dark(var(--n-d-surface), var(--n-100));
-    --shadow-1: light-dark(0 1px 3px rgba(17, 24, 39, 0.08), 0 1px 3px rgba(0, 0, 0, 0.45));
-    --shadow-2: light-dark(0 8px 20px rgba(17, 24, 39, 0.15), 0 8px 20px rgba(0, 0, 0, 0.55));
-    --shadow-drawer: light-dark(-8px 0 24px rgba(17, 24, 39, 0.08), -8px 0 24px rgba(0, 0, 0, 0.5));
+    /* depth: two levels. surfaces get lighter as they rise in dark mode
+       (page < sunken < surface < raised), so shadow does less work there. */
+    --shadow-sm: light-dark(0 1px 2px rgba(17, 24, 39, 0.06), 0 1px 2px rgba(0, 0, 0, 0.4));
+    --shadow-md: light-dark(0 6px 16px rgba(17, 24, 39, 0.12), 0 6px 16px rgba(0, 0, 0, 0.5));
+    /* one focus ring for everything: 2px accent + 2px offset */
+    --focus-ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent);
 }
 
 /* Theme mechanism: no stored choice = follow the OS; a stored choice pins
@@ -120,7 +130,29 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     color: var(--text);
     background-color: var(--bg);
-    line-height: 1.5;
+    font-size: var(--fs-md);
+    line-height: var(--lh-md);
+    font-weight: var(--fw-regular);
+    -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+    font-weight: var(--fw-semibold);
+    line-height: var(--lh-lg);
+    text-wrap: balance;
+}
+
+p {
+    text-wrap: pretty;
+}
+
+/* one focus ring for every interactive element: 2px accent, 2px offset,
+   visible on every surface in both themes (the inner ring is the surface
+   colour, so it reads as a gap rather than a smear) */
+:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+    border-radius: var(--r-sm);
 }
 
 /* themed selection + scrollbars (both colors adapt per theme) */
@@ -134,9 +166,65 @@ body {
     scrollbar-width: thin;
 }
 
+/* reduced motion: one rule collapses every duration and kills transforms.
+   The per-element no-preference blocks above simply never match. */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    .card:hover,
+    .list-row:hover,
+    .card-drag,
+    .toast,
+    .toast-show,
+    .theme-toggle[aria-pressed="true"] .icon {
+        transform: none !important;
+    }
+}
+
 /* Alpine hides cloaked elements until its first init (theme icons) */
 [x-cloak] {
     display: none !important;
+}
+
+/* ============================================================
+   MICRO-INTERACTIONS
+   Every one of these is opt-out: the whole block sits inside
+   no-preference, so prefers-reduced-motion users never see them and the
+   single reduce rule above is belt-and-braces for anything added later.
+   Durations live on the --dur-* scale (120/180/240ms).
+   ============================================================ */
+@media (prefers-reduced-motion: no-preference) {
+    /* press feedback: every button sinks slightly, then springs back.
+       The toast and notes drawer already carry their own enter/exit
+       transitions (.toast-show, x-transition) so they are not re-animated
+       here — that would double-run on every swap. */
+    button,
+    .empty-action,
+    .theme-toggle {
+        transition: transform var(--dur-1) var(--ease-out);
+    }
+
+    button:active,
+    .empty-action:active,
+    .theme-toggle:active {
+        transform: scale(0.98);
+    }
+
+    /* status bars drop in from the top; draft bar rises from the bottom */
+    .banner {
+        animation: slideInDown var(--dur-3) var(--ease-out);
+    }
+
+    .draft-bar {
+        animation: slideInUp var(--dur-3) var(--ease-out);
+    }
 }
 
 /* Icons — one rule; colour is inherited via currentColor so dark mode, hover,
@@ -197,12 +285,12 @@ html.nav-locked body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
+    gap: var(--s-2);
     border-bottom: 1px solid var(--border);
 }
 
 .sidebar-close {
-    margin-right: 0.75rem;
+    margin-right: var(--s-3);
 }
 
 @media (max-width: 1023px) {
@@ -213,7 +301,7 @@ html.nav-locked body {
         left: 0;
         z-index: 60;
         transform: translateX(-100%);
-        transition: transform 200ms ease;
+        transition: transform var(--dur-2) ease;
     }
 
     .sidebar[data-open="true"] {
@@ -254,18 +342,18 @@ html.nav-locked body {
     height: var(--topbar-height);
     display: flex;
     align-items: center;
-    padding: 0 1.5rem;
+    padding: 0 var(--s-6);
     font-weight: 700;
-    font-size: 1.1rem;
+    font-size: var(--fs-lg);
     letter-spacing: -0.025em;
     color: var(--accent);
 }
 
 .projects {
-    padding: 1rem 0.75rem;
+    padding: var(--s-4) var(--s-3);
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: var(--s-1);
 }
 
 /* Board list: each item is a button (an in-app switch, not a navigation);
@@ -279,17 +367,17 @@ html.nav-locked body {
 .project-btn {
     flex: 1;
     min-width: 0;
-    padding: 0.5rem 0.75rem;
-    border-radius: 6px;
+    padding: var(--s-2) var(--s-3);
+    border-radius: var(--r-sm);
     border: none;
     background: transparent;
     color: var(--text-muted);
     text-align: left;
     font-family: inherit;
-    font-size: 0.9rem;
-    font-weight: 500;
+    font-size: var(--fs-md);
+    font-weight: var(--fw-medium);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all var(--dur-2) ease;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -313,10 +401,10 @@ html.nav-locked body {
     border: none;
     background: transparent;
     color: var(--text-muted);
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     line-height: 1;
-    padding: 0.25rem 0.4rem;
-    border-radius: 6px;
+    padding: var(--s-1) 0.4rem;
+    border-radius: var(--r-sm);
     cursor: pointer;
     display: inline-flex;
     align-items: center;
@@ -341,28 +429,22 @@ html.nav-locked body {
     background: var(--surface-muted);
 }
 
-.project-x:focus-visible,
-.project-edit:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 1px;
-}
-
 .board-rename {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.25rem;
+    gap: var(--s-1);
     flex: 1;
-    padding-left: 0.75rem;
+    padding-left: var(--s-3);
 }
 
 .board-rename input {
     flex: 1;
     min-width: 0;
     border: 1px solid var(--accent);
-    border-radius: 6px;
-    padding: 0.35rem 0.5rem;
-    font-size: 0.85rem;
+    border-radius: var(--r-sm);
+    padding: 0.35rem var(--s-2);
+    font-size: var(--fs-sm);
 }
 
 .board-rename input:focus {
@@ -374,9 +456,9 @@ html.nav-locked body {
     border: 1px solid var(--accent);
     background: var(--accent);
     color: var(--on-accent);
-    border-radius: 6px;
-    padding: 0.35rem 0.5rem;
-    font-size: 0.75rem;
+    border-radius: var(--r-sm);
+    padding: 0.35rem var(--s-2);
+    font-size: var(--fs-xs);
     cursor: pointer;
 }
 
@@ -384,20 +466,20 @@ html.nav-locked body {
 .rename-error {
     flex-basis: 100%;
     margin: 0;
-    padding-left: 0.1rem;
+    padding-left: 0.var(--s-4);
     color: var(--danger);
-    font-size: 0.72rem;
-    line-height: 1.3;
+    font-size: var(--fs-xs);
+    line-height: var(--lh-xl);
 }
 
 .board-add input {
     width: 100%;
-    padding: 0.4rem 0.75rem;
+    padding: 0.4rem var(--s-3);
     border: 1px dashed var(--border);
-    border-radius: 6px;
+    border-radius: var(--r-sm);
     background: transparent;
     font-family: inherit;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     color: var(--text-muted);
 }
 
@@ -428,9 +510,9 @@ html.nav-locked body {
     border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
-    padding: 0 1rem;
+    padding: 0 var(--s-4);
     padding-top: env(safe-area-inset-top);
-    gap: 0.75rem;
+    gap: var(--s-3);
     flex-wrap: wrap;
 }
 
@@ -443,8 +525,8 @@ html.nav-locked body {
 .topbar-title {
     flex: 1;
     min-width: 0;
-    font-weight: 600;
-    font-size: 0.95rem;
+    font-weight: var(--fw-semibold);
+    font-size: var(--fs-lg);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -461,11 +543,11 @@ html.nav-locked body {
     width: auto;
     background: none;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--r-sm);
     padding: 0.4rem 0.6rem;
     cursor: pointer;
     color: var(--text-muted);
-    transition: background 0.2s;
+    transition: background var(--dur-2), transform var(--dur-1) var(--ease-out);
 }
 
 .icon-btn:hover {
@@ -490,18 +572,15 @@ html.nav-locked body {
     display: block;
 }
 
-.theme-toggle:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-}
+/* theme-toggle uses the global focus ring below; no per-element rule */
 
 /* View Tabs */
 .tabs {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--s-2);
     background: var(--surface-muted);
-    padding: 0.25rem;
-    border-radius: 8px;
+    padding: var(--s-1);
+    border-radius: var(--r-md);
 }
 
 /* below 640: row 2 — full width, scrollable if it ever overflows */
@@ -521,13 +600,13 @@ html.nav-locked body {
 .tabs button {
     background: transparent;
     border: none;
-    padding: 0.4rem 1rem;
-    font-size: 0.85rem;
-    font-weight: 500;
-    border-radius: 6px;
+    padding: 0.4rem var(--s-4);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    border-radius: var(--r-sm);
     cursor: pointer;
     color: var(--text-muted);
-    transition: all 0.2s;
+    transition: all var(--dur-2);
 }
 
 .tabs button:hover {
@@ -537,7 +616,7 @@ html.nav-locked body {
 .tabs button.active {
     background: var(--surface-raised);
     color: var(--text);
-    box-shadow: var(--shadow-1);
+    box-shadow: var(--shadow-sm);
 }
 
 /* Search — wrap pushes right at >=640; below that the icon expands the
@@ -546,7 +625,7 @@ html.nav-locked body {
 .search-wrap {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--s-2);
     flex: 0 1 auto;
     min-width: 0;
 }
@@ -565,12 +644,12 @@ html.nav-locked body {
     width: 100%;
     max-width: 260px;
     border: 1px solid var(--border);
-    border-radius: 999px;
+    border-radius: var(--r-full);
     background: var(--surface-sunken);
-    padding: 0.5rem 1rem;
-    font-size: 0.85rem;
+    padding: var(--s-2) var(--s-4);
+    font-size: var(--fs-sm);
     color: var(--text);
-    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+    transition: border-color var(--dur-2), box-shadow var(--dur-2), background var(--dur-2);
 }
 
 .search::placeholder {
@@ -593,15 +672,25 @@ html.nav-locked body {
     to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes slideInDown {
+    from { opacity: 0; transform: translateY(-0.5rem); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInUp {
+    from { opacity: 0; transform: translateY(0.5rem); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 @media (prefers-reduced-motion: no-preference) {
     .board-wrap.view-enter {
-        animation: fadeIn 0.3s ease;
+        animation: fadeIn var(--dur-3) ease;
     }
 }
 
 /* Board */
 .main > .board-wrap {
-    padding: 1.5rem;
+    padding: var(--s-6);
     overflow: auto;
     flex: 1;
     /* also the containing block for the .sr-only labels inside the lane —
@@ -614,7 +703,7 @@ html.nav-locked body {
    the next, so the wrapper scrolls x — snap on the same scroller). */
 .columns {
     display: flex;
-    gap: 1rem;
+    gap: var(--s-4);
     align-items: flex-start;
     min-height: 100%;
 }
@@ -625,11 +714,11 @@ html.nav-locked body {
     scroll-snap-align: start;
     background: var(--surface-sunken);
     border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 0.75rem;
+    border-radius: var(--r-lg);
+    padding: var(--s-3);
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: var(--s-3);
 }
 
 @media (min-width: 640px) and (max-width: 1023px) {
@@ -652,7 +741,7 @@ html.nav-locked body {
 
 .board-wrap {
     scroll-snap-type: x mandatory;
-    scroll-padding-inline: 1.5rem;
+    scroll-padding-inline: var(--s-6);
 }
 
 @media (min-width: 1024px) {
@@ -664,13 +753,13 @@ html.nav-locked body {
 .column-head {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0 0.25rem;
+    gap: var(--s-2);
+    padding: 0 var(--s-1);
 }
 
 .column-head h2 {
-    font-size: 0.9rem;
-    font-weight: 600;
+    font-size: var(--fs-md);
+    font-weight: var(--fw-semibold);
     flex: 1;
 }
 
@@ -687,39 +776,31 @@ html.nav-locked body {
 .dot-done { background: var(--dot-done); }
 
 .count {
-    font-size: 0.75rem;
-    font-weight: 600;
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-semibold);
     color: var(--text-muted);
     background: var(--surface-muted);
-    border-radius: 999px;
-    padding: 0.05rem 0.5rem;
+    border-radius: var(--r-full);
+    padding: 0.05rem var(--s-2);
 }
 
 .cards {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: var(--s-2);
     min-height: 4rem;
-}
-
-/* ponytail: :has not :empty -- EJS leaves whitespace inside .cards so :empty never matches */
-.cards:not(:has(.card))::after {
-    content: "No tasks";
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    border: 1px dashed var(--border);
-    border-radius: 8px;
-    padding: 1rem;
-    text-align: center;
 }
 
 .card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 0.75rem;
+    border-radius: var(--r-md);
+    padding: var(--s-3);
+    box-shadow: var(--shadow-sm);
     cursor: grab;
-    transition: border-color 0.2s, box-shadow 0.2s;
+    transition: border-color var(--dur-2) var(--ease-out),
+        box-shadow var(--dur-2) var(--ease-out),
+        transform var(--dur-2) var(--ease-out);
     /* touch: pan-y lets the lane scroll vertically while Sortable's
        delayOnTouchOnly claims the long-press; no text-selection on drag */
     touch-action: pan-y;
@@ -727,16 +808,20 @@ html.nav-locked body {
     -webkit-user-select: none;
 }
 
-.card:hover {
-    border-color: var(--accent);
-    box-shadow: var(--shadow-1);
+/* lift on hover — fine pointers only, so touch drag never fights it */
+@media (hover: hover) and (pointer: fine) {
+    .card:hover {
+        border-color: var(--accent);
+        box-shadow: var(--shadow-md);
+        transform: translateY(-1px);
+    }
 }
 
-.card:active { cursor: grabbing; }
+.card:active { cursor: grabbing; transform: none; }
 
 .card-title {
-    font-size: 0.875rem;
-    line-height: 1.4;
+    font-size: var(--fs-sm);
+    line-height: var(--lh-xs);
     overflow-wrap: anywhere; /* long titles wrap instead of widening the card */
 }
 
@@ -744,13 +829,13 @@ html.nav-locked body {
     width: 100%;
     background: transparent;
     border: 1px dashed var(--border);
-    border-radius: 8px;
+    border-radius: var(--r-md);
     padding: 0.6rem;
-    font-size: 0.8rem;
-    font-weight: 500;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
     color: var(--text-muted);
     cursor: pointer;
-    transition: color 0.2s, border-color 0.2s, background 0.2s;
+    transition: color var(--dur-2), border-color var(--dur-2), background var(--dur-2), transform var(--dur-1) var(--ease-out);
 }
 
 .add-btn:hover {
@@ -762,18 +847,18 @@ html.nav-locked body {
 .add-form {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: var(--s-2);
 }
 
 .add-form input {
     width: 100%;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--r-md);
     padding: 0.6rem;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     background: var(--surface);
     color: var(--text);
-    transition: border-color 0.2s, box-shadow 0.2s;
+    transition: border-color var(--dur-2), box-shadow var(--dur-2);
 }
 
 .add-form input::placeholder {
@@ -789,13 +874,13 @@ html.nav-locked body {
 .add-form button {
     background: var(--accent);
     border: none;
-    border-radius: 8px;
+    border-radius: var(--r-md);
     padding: 0.6rem;
-    font-size: 0.85rem;
-    font-weight: 500;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
     color: var(--on-accent);
     cursor: pointer;
-    transition: filter 0.2s;
+    transition: filter var(--dur-2), transform var(--dur-1) var(--ease-out);
 }
 
 .add-form button:hover {
@@ -822,15 +907,15 @@ html.nav-locked body {
     display: flex;
     align-items: center;
     gap: 0.35rem;
-    margin-top: 0.5rem;
+    margin-top: var(--s-2);
 }
 
 .move-select {
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--r-sm);
     background: var(--surface);
     color: var(--text-muted);
-    font-size: 0.75rem;
+    font-size: var(--fs-xs);
     padding: 0.15rem 0.3rem;
     max-width: 7.5rem;
     cursor: pointer;
@@ -854,14 +939,8 @@ html.nav-locked body {
     white-space: nowrap;
 }
 
-.move-select:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-}
-
 .card:has(:focus-visible) {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
+    border-color: var(--accent);
 }
 
 /* Notes */
@@ -887,9 +966,9 @@ html.nav-locked body {
     margin-left: auto;
     background: none;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--r-sm);
     padding: 0.15rem 0.45rem;
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     color: var(--text-muted);
     cursor: pointer;
 }
@@ -916,14 +995,14 @@ html.nav-locked body {
     width: min(var(--notes-width), 92vw);
     background: var(--surface);
     border-left: 1px solid var(--border);
-    box-shadow: var(--shadow-drawer);
+    box-shadow: var(--shadow-md);
     z-index: 50;
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    padding: 1rem;
-    padding-top: calc(1rem + env(safe-area-inset-top));
-    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+    gap: var(--s-3);
+    padding: var(--s-4);
+    padding-top: calc(var(--s-4) + env(safe-area-inset-top));
+    padding-bottom: calc(var(--s-4) + env(safe-area-inset-bottom));
 }
 
 /* phone: full-height sheet, no side border */
@@ -937,20 +1016,20 @@ html.nav-locked body {
 .notes-head {
     display: flex;
     align-items: flex-start;
-    gap: 0.5rem;
+    gap: var(--s-2);
 }
 
 .notes-head h2 {
     flex: 1;
-    font-size: 0.95rem;
-    font-weight: 600;
+    font-size: var(--fs-lg);
+    font-weight: var(--fw-semibold);
 }
 
 .notes-close {
     background: none;
     border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 0.15rem 0.5rem;
+    border-radius: var(--r-sm);
+    padding: 0.15rem var(--s-2);
     cursor: pointer;
     color: var(--text-muted);
 }
@@ -959,7 +1038,7 @@ html.nav-locked body {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: var(--s-3);
     min-height: 0;
 }
 
@@ -968,31 +1047,29 @@ html.nav-locked body {
     min-height: 10rem;
     resize: vertical;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--r-md);
     padding: 0.6rem;
     font: inherit;
-    font-size: 0.875rem;
+    font-size: var(--fs-sm);
 }
 
 .notes-textarea:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 1px;
     border-color: var(--accent);
 }
 
 .notes-foot {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: var(--s-3);
 }
 
 .notes-save {
     background: var(--accent);
     border: none;
-    border-radius: 8px;
+    border-radius: var(--r-md);
     color: var(--on-accent);
-    padding: 0.5rem 1rem;
-    font-size: 0.85rem;
+    padding: var(--s-2) var(--s-4);
+    font-size: var(--fs-sm);
     cursor: pointer;
 }
 
@@ -1003,15 +1080,15 @@ html.nav-locked body {
 .notes-retry {
     background: none;
     border: 1px solid var(--accent);
-    border-radius: 8px;
+    border-radius: var(--r-md);
     color: var(--accent);
-    padding: 0.35rem 0.75rem;
-    font-size: 0.8rem;
+    padding: 0.35rem var(--s-3);
+    font-size: var(--fs-sm);
     cursor: pointer;
 }
 
 .note-status {
-    font-size: 0.75rem;
+    font-size: var(--fs-xs);
     color: var(--text-muted);
 }
 
@@ -1020,12 +1097,12 @@ html.nav-locked body {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 0.5rem;
-    padding: 0.5rem 0.6rem;
+    gap: var(--s-2);
+    padding: var(--s-2) 0.6rem;
     border: 1px solid var(--accent);
-    border-radius: 8px;
+    border-radius: var(--r-md);
     background: var(--accent-soft);
-    font-size: 0.75rem;
+    font-size: var(--fs-xs);
 }
 
 .draft-bar span {
@@ -1035,9 +1112,9 @@ html.nav-locked body {
 
 .draft-restore,
 .draft-discard {
-    border-radius: 6px;
+    border-radius: var(--r-sm);
     padding: 0.3rem 0.7rem;
-    font-size: 0.75rem;
+    font-size: var(--fs-xs);
     cursor: pointer;
 }
 
@@ -1063,9 +1140,9 @@ html.nav-locked body {
 .conflict-keep,
 .conflict-take,
 .conflict-show {
-    border-radius: 6px;
+    border-radius: var(--r-sm);
     padding: 0.3rem 0.7rem;
-    font-size: 0.75rem;
+    font-size: var(--fs-xs);
     cursor: pointer;
 }
 
@@ -1082,42 +1159,32 @@ html.nav-locked body {
     color: var(--text-muted);
 }
 
-.conflict-keep:focus {
-    outline: 2px solid var(--accent);
-    outline-offset: 1px;
-}
-
 /* read-only server text behind the "show server text" toggle (x-text only) */
 .conflict-server {
     flex-basis: 100%;
     max-height: 8rem;
     overflow: auto;
     margin: 0;
-    padding: 0.35rem 0.5rem;
+    padding: 0.35rem var(--s-2);
     background: var(--surface);
     border: 1px dashed var(--border);
-    border-radius: 6px;
+    border-radius: var(--r-sm);
     font: 0.75rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
     white-space: pre-wrap;
     color: var(--text-muted);
-}
-
-.draft-restore:focus {
-    outline: 2px solid var(--accent);
-    outline-offset: 1px;
 }
 
 /* Continue banner: values come from $store.mb.ui, markup is re-rendered per swap */
 .continue-bar {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
-    padding: 0.5rem 0.75rem;
+    gap: var(--s-3);
+    margin-bottom: var(--s-4);
+    padding: var(--s-2) var(--s-3);
     border: 1px solid var(--accent);
-    border-radius: 10px;
+    border-radius: var(--r-lg);
     background: var(--accent-soft);
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
 }
 
 .continue-msg {
@@ -1126,35 +1193,26 @@ html.nav-locked body {
 }
 
 .continue-msg strong {
-    font-weight: 600;
+    font-weight: var(--fw-semibold);
 }
 
 .continue-open {
     background: var(--accent);
     border: none;
-    border-radius: 6px;
+    border-radius: var(--r-sm);
     color: var(--on-accent);
-    padding: 0.3rem 0.75rem;
-    font-size: 0.75rem;
+    padding: 0.3rem var(--s-3);
+    font-size: var(--fs-xs);
     cursor: pointer;
 }
 
 .continue-x {
     background: none;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--r-sm);
     color: var(--text-muted);
-    padding: 0.15rem 0.5rem;
+    padding: 0.15rem var(--s-2);
     cursor: pointer;
-}
-
-.card:focus-visible,
-.column:focus-visible,
-.continue-open:focus-visible,
-.continue-x:focus-visible,
-.draft-discard:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
 }
 
 /* Drag & drop (SortableJS classes set in public/dnd.js) */
@@ -1169,7 +1227,7 @@ html.nav-locked body {
 }
 
 .card-drag {
-    box-shadow: var(--shadow-2);
+    box-shadow: var(--shadow-md);
     cursor: grabbing;
 }
 
@@ -1180,43 +1238,64 @@ html.nav-locked body {
     right: max(1.25rem, env(safe-area-inset-right));
     background: var(--surface-inverse);
     color: var(--on-inverse);
-    padding: 0.6rem 1rem;
-    border-radius: 8px;
-    font-size: 0.85rem;
+    padding: var(--s-2) var(--s-4);
+    border-radius: var(--r-md);
+    font-size: var(--fs-sm);
+    box-shadow: var(--shadow-md);
     z-index: 100;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.2s ease;
+    transition: opacity var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out);
+    transform: translateY(4px);
 }
 
 .toast-show {
     opacity: 1;
+    transform: none;
 }
-/* Table view: one sortable table of the current board. The Status cell is the
-   same move select as the card, rendered visible (no sr-only). */
+/* ============================================================
+   TABLE
+   One sortable table of the current board. The Status cell is the same
+   move select as the card, rendered visible (no sr-only). The wrapper is
+   the scroll container: horizontal for wide tables, and the sticky header
+   sticks to the top of it.
+   ============================================================ */
 .table-wrap {
-    overflow-x: auto;
+    overflow: auto;
+    max-height: calc(100dvh - var(--topbar-height) - var(--s-6) * 2);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
 }
 
 .task-table {
     width: 100%;
-    border-collapse: collapse;
-    font-size: 0.9rem;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: var(--fs-sm);
 }
 
 .task-table th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
     text-align: left;
-    padding: 0.4rem 0.75rem;
-    border-bottom: 2px solid var(--border);
+    padding: var(--s-2) var(--s-3);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
     color: var(--text-muted);
-    font-weight: 600;
-    font-size: 0.75rem;
+    font-weight: var(--fw-semibold);
+    font-size: var(--fs-xs);
+    line-height: var(--lh-xs);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.06em;
     white-space: nowrap;
 }
 
 .sort-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
     background: none;
     border: none;
     padding: 0;
@@ -1225,19 +1304,46 @@ html.nav-locked body {
     text-transform: inherit;
     letter-spacing: inherit;
     cursor: pointer;
+    transition: color var(--dur-1) var(--ease-out);
 }
 
-.sort-btn:hover {
-    color: var(--accent);
+/* active column: full-strength text + a visible chevron. inactive: the
+   chevron is hidden until hover/focus, then shows faint. */
+.sort-btn .icon {
+    opacity: 0;
+    transition: opacity var(--dur-1) var(--ease-out);
+}
+
+.sort-btn.is-active {
+    color: var(--text);
+}
+
+.sort-btn.is-active .icon {
+    opacity: 1;
+}
+
+.sort-btn:hover,
+.sort-btn:focus-visible {
+    color: var(--text);
+}
+
+.sort-btn:not(.is-active):hover .icon,
+.sort-btn:not(.is-active):focus-visible .icon {
+    opacity: 0.45;
 }
 
 .task-table td {
-    padding: 0.55rem 0.75rem;
+    padding: var(--s-3);
     border-bottom: 1px solid var(--border);
     vertical-align: middle;
+    background: var(--surface);
 }
 
-.task-table tr:hover td {
+.task-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.task-table tbody tr:hover td {
     background: var(--surface-muted);
 }
 
@@ -1245,23 +1351,54 @@ html.nav-locked body {
     min-width: 14rem;
 }
 
+/* the status select in the table is a visible control: match the inputs */
+.task-table .move-select {
+    height: 2rem;
+    padding: 0 var(--s-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background-color: var(--surface);
+    color: var(--text);
+    font-family: inherit;
+    font-size: var(--fs-sm);
+}
+
+.task-table .move-select:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+    border-color: var(--accent);
+}
+
 .note-cell {
     white-space: nowrap;
     color: var(--text-muted);
 }
 
+/* "yes" becomes a small pill instead of loose bold text */
 .has-note {
+    display: inline-block;
+    padding: 0 var(--s-2);
+    border-radius: var(--r-full);
+    background: var(--accent-soft);
     color: var(--accent);
-    font-weight: 600;
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-semibold);
+    line-height: 1.6;
+}
+
+.no-note {
+    color: var(--text-muted);
 }
 
 .note-when {
-    margin-left: 0.4rem;
-    font-size: 0.75rem;
+    margin-left: var(--s-2);
+    font-size: var(--fs-xs);
+    font-variant-numeric: tabular-nums;
 }
 
 .order-cell {
     color: var(--text-muted);
+    text-align: right;
     font-variant-numeric: tabular-nums;
 }
 
@@ -1272,29 +1409,40 @@ html.nav-locked body {
 
 .row-actions .notes-btn {
     margin-left: 0;
-    margin-right: 0.35rem;
+    margin-right: var(--s-1);
 }
 
-/* >=640: table with a sticky first column (title stays visible while
-   Status/Note/Order scroll sideways). */
+/* >=640: sticky first column so the title stays visible while the rest
+   scrolls sideways. The header cell sits above it. */
 @media (min-width: 640px) {
     .task-table th:first-child,
     .task-table td:first-child {
         position: sticky;
         left: 0;
-        background: var(--bg);
         z-index: 1;
     }
 
-    .task-table tr:hover td:first-child {
+    .task-table th:first-child {
+        z-index: 3;
+    }
+
+    .task-table tbody tr:hover td:first-child {
         background: var(--surface-muted);
     }
 }
 
 /* <640: table becomes stacked cards (th labels off, td::before from
    data-label; title and actions get their own rows). Thead goes sr-only so
-   the sort buttons stay tabbable. */
+   the sort buttons stay tabbable. Cards match the board card style. */
 @media (max-width: 639px) {
+    .table-wrap {
+        max-height: none;
+        overflow: visible;
+        border: none;
+        background: transparent;
+        border-radius: 0;
+    }
+
     .task-table thead {
         position: absolute;
         width: 1px;
@@ -1312,11 +1460,12 @@ html.nav-locked body {
     }
 
     .task-table tr {
-        margin-bottom: 0.75rem;
-        padding: 0.6rem 0.75rem;
+        margin-bottom: var(--s-3);
+        padding: var(--s-3);
         background: var(--surface);
         border: 1px solid var(--border);
-        border-radius: 8px;
+        border-radius: var(--r-md);
+        box-shadow: var(--shadow-sm);
     }
 
     .task-table tr:hover {
@@ -1331,26 +1480,27 @@ html.nav-locked body {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        gap: 1rem;
-        padding: 0.3rem 0;
+        gap: var(--s-4);
+        padding: var(--s-1) 0;
         border: none;
         white-space: normal;
+        background: transparent;
     }
 
     .task-table td[data-label]:not([data-label=""])::before {
         content: attr(data-label);
-        font-size: 0.75rem;
-        font-weight: 600;
+        font-size: var(--fs-xs);
+        font-weight: var(--fw-semibold);
         text-transform: uppercase;
-        letter-spacing: 0.04em;
+        letter-spacing: 0.06em;
         color: var(--text-muted);
     }
 
     .title-cell {
         min-width: 0;
-        font-weight: 600;
-        padding-bottom: 0.5rem;
-        margin-bottom: 0.35rem;
+        font-weight: var(--fw-semibold);
+        padding-bottom: var(--s-2);
+        margin-bottom: var(--s-2);
         border-bottom: 1px solid var(--border);
     }
 
@@ -1358,64 +1508,164 @@ html.nav-locked body {
         white-space: normal;
     }
 
+    .order-cell {
+        text-align: left;
+    }
+
     .row-actions {
         text-align: left;
-        padding-top: 0.5rem;
+        padding-top: var(--s-2);
     }
 }
 
-.empty-view {
-    padding: 1.25rem 0.75rem;
+/* ============================================================
+   EMPTY STATES
+   One shape for all of them: icon, one short line, optional action.
+   The column variant is hidden by :has(.card) — the mechanism the column
+   view already used, kept because EJS leaves whitespace inside .cards so
+   :empty never matches.
+   ============================================================ */
+.empty-state {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-3);
+    padding: var(--s-5) var(--s-4);
+    text-align: center;
     color: var(--text-muted);
-    font-size: 0.9rem;
+    border: 1px dashed var(--border);
+    border-radius: var(--r-md);
 }
 
-/* List view: compact rows grouped under column headings */
+.empty-state .icon {
+    width: var(--icon-lg);
+    height: var(--icon-lg);
+    color: var(--text-muted);
+}
+
+.empty-msg {
+    font-size: var(--fs-sm);
+    line-height: var(--lh-sm);
+    margin: 0;
+    text-wrap: pretty;
+}
+
+.empty-action {
+    margin-top: var(--s-1);
+    padding: var(--s-2) var(--s-4);
+    border: 1px solid var(--accent);
+    border-radius: var(--r-sm);
+    background: var(--accent);
+    color: var(--on-accent);
+    font-family: inherit;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+    transition: background var(--dur-1) var(--ease-out), transform var(--dur-1) var(--ease-out);
+}
+
+.empty-action:hover {
+    filter: brightness(1.08);
+}
+
+.empty-action:active {
+    transform: scale(0.98);
+}
+
+/* column empty state: only when its own .cards lane has no card */
+.cards:not(:has(.card)) + .empty-state.is-column {
+    display: flex;
+}
+
+/* board / table / list empty states are rendered only when relevant */
+.empty-state.is-board,
+.empty-state.is-table,
+.empty-state.is-list,
+.empty-state.is-search {
+    display: flex;
+}
+
+/* search empty state doesn't need the dashed box inside an already
+   bordered table wrapper */
+.table-wrap .empty-state.is-search,
+.table-wrap .empty-state.is-table {
+    border: none;
+}
+
+/* ============================================================
+   LIST
+   Compact rows grouped under column headings. Group headings reuse the
+   board column's dot + count pill; rows share the board card's surface,
+   border, radius and shadow so the two views feel like one object.
+   ============================================================ */
 .task-list {
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: var(--s-5);
 }
 
 .list-head {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.4rem;
-    font-size: 0.8rem;
-    font-weight: 600;
+    gap: var(--s-2);
+    margin-bottom: var(--s-2);
+    font-size: var(--fs-xs);
+    line-height: var(--lh-xs);
+    font-weight: var(--fw-semibold);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.06em;
     color: var(--text-muted);
 }
 
 .list-row {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.5rem 0.75rem;
-    margin-bottom: 0.35rem;
+    gap: var(--s-3);
+    padding: var(--s-3);
+    margin-bottom: var(--s-2);
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    transition: border-color 0.2s;
+    border-radius: var(--r-md);
+    box-shadow: var(--shadow-sm);
+    transition: border-color var(--dur-2) var(--ease-out),
+        box-shadow var(--dur-2) var(--ease-out),
+        transform var(--dur-2) var(--ease-out);
 }
 
-.list-row:hover {
-    border-color: var(--accent);
+@media (hover: hover) and (pointer: fine) {
+    .list-row:hover {
+        border-color: var(--accent);
+        box-shadow: var(--shadow-md);
+        transform: translateY(-1px);
+    }
 }
 
 .list-title {
     flex: 1;
     min-width: 0;
     overflow-wrap: anywhere;
+    font-size: var(--fs-sm);
+    line-height: var(--lh-sm);
+    text-wrap: pretty;
 }
 
 .list-note {
     display: inline-block;
 }
 
+/* controls sit at the trailing edge, aligned across every row */
+.list-row .move-select,
+.list-row .notes-btn,
+.list-row button:last-child {
+    margin-left: auto;
+}
+
 .list-row .notes-btn {
+    margin-left: 0;
+}
+
+.list-row .move-select + .notes-btn {
     margin-left: 0;
 }
 
@@ -1466,7 +1716,7 @@ html.nav-locked body {
     .move-select {
         min-height: 44px;
         max-width: none;
-        padding: 0.35rem 0.5rem;
+        padding: 0.35rem var(--s-2);
     }
 
     .project-x,
@@ -1495,4 +1745,73 @@ html.nav-locked body {
 .theme-fade,
 .theme-fade * {
     transition: background-color 250ms ease, color 250ms ease, border-color 250ms ease;
+}
+
+/* ============================================================
+   FORCED COLORS (Windows High Contrast / forced-colors: active)
+   Backgrounds and colours are replaced by the OS palette, so anything
+   that was told apart only by colour gets a shape or border fallback.
+   Nothing here changes the normal render — it is all inside the media
+   query.
+   ============================================================ */
+@media (forced-colors: active) {
+    /* box-shadow is not painted in forced colors, so the focus ring has
+       to fall back to an outline in the system Highlight colour */
+    :focus-visible {
+        outline: 2px solid Highlight;
+        outline-offset: 2px;
+    }
+
+    /* status dots: hollow circle / dashed circle / square */
+    .dot {
+        background: transparent;
+        border: 2px solid CanvasText;
+        box-sizing: border-box;
+    }
+
+    .dot-planned {
+        border-radius: 50%;
+        border-style: solid;
+    }
+
+    .dot-progress {
+        border-radius: 50%;
+        border-style: dashed;
+    }
+
+    .dot-done {
+        border-radius: 2px;
+        border-style: solid;
+    }
+
+    /* pills that were told apart by background alone */
+    .count,
+    .has-note {
+        border: 1px solid CanvasText;
+    }
+
+    .note-dot {
+        border: 1px solid CanvasText;
+        box-sizing: border-box;
+    }
+
+    /* icons are currentColor, already fine; make sure sprite use is not
+       filtered out by any inherited filter */
+    .icon {
+        forced-color-adjust: auto;
+    }
+
+    /* the accent-bordered card-open state loses its ring; keep a visible
+       outline instead */
+    .card-open {
+        outline: 2px solid Highlight;
+        outline-offset: 1px;
+    }
+
+    /* table row hover was background-only */
+    .task-table tbody tr:hover td {
+        background: transparent;
+        outline: 1px solid Highlight;
+        outline-offset: -1px;
+    }
 }

@@ -1,0 +1,20 @@
+<%# Shared empty state: an ionicon, one short line, and (optionally) a clear
+    next action. kind picks the icon. `message` is printed escaped, so a user
+    search query is safe to pass straight through. %>
+<%
+    const EMPTY_ICONS = {
+        column: "albums-outline",
+        board: "add-outline",
+        list: "list-outline",
+        table: "grid-outline",
+        search: "search-outline",
+    };
+    const emptyIcon = EMPTY_ICONS[kind] || "albums-outline";
+%>
+<div class="empty-state is-<%= kind %>">
+    <%- icon(emptyIcon) %>
+    <p class="empty-msg"><%= message %></p>
+    <% if (locals.action) { %>
+        <button type="button" class="empty-action"<%- locals.actionAttr ? " " + actionAttr : "" %>><%= action %></button>
+    <% } %>
+</div>
